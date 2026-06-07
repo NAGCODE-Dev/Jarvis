@@ -9,6 +9,7 @@ from jarvis.config import settings
 
 
 DEFAULT_CAPABILITIES = {
+    "qwen3:8b": {"coding": 11, "planning": 8, "reasoning": 9, "general": 8},
     "qwen3:4b": {"coding": 10, "planning": 7, "reasoning": 8, "general": 7},
     "qwen3:1.7b": {"coding": 7, "planning": 5, "reasoning": 5, "general": 5},
     "gemma4:e4b": {"coding": 6, "planning": 10, "reasoning": 9, "general": 9},

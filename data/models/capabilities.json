@@ -1,4 +1,10 @@
 {
+  "qwen3:8b": {
+    "coding": 11,
+    "planning": 8,
+    "reasoning": 9,
+    "general": 8
+  },
   "qwen3:4b": {
     "coding": 10,
     "planning": 7,
@@ -27,4 +33,3 @@
     "embeddings": 10
   }
 }
-

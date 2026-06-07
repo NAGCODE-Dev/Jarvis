@@ -1,8 +1,7 @@
 {
   "rankings": {
-    "coding_primary": ["qwen3:4b", "qwen3:1.7b"],
+    "coding_primary": ["qwen3:8b", "qwen3:4b", "qwen3:1.7b"],
     "planning_primary": ["gemma4:e4b", "gemma4:e2b"],
-    "safe_fallback": ["qwen3:1.7b", "gemma4:e2b"]
+    "safe_fallback": ["qwen3:4b", "qwen3:1.7b", "gemma4:e2b"]
   }
 }
-

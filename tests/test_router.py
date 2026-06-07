@@ -7,7 +7,7 @@ from jarvis.schemas import ChatMessage
 
 class FakeOllama:
     def list_models(self):
-        return {"models": [{"name": "qwen3:4b"}]}
+        return {"models": [{"name": "qwen3:8b"}]}
 
     def chat(self, model, messages, temperature=None):
         return f"{model}:{messages[-1].content}"
@@ -28,7 +28,7 @@ class FallbackOllama(FakeOllama):
         return {"models": [{"name": "qwen2.5:3b"}]}
 
     def chat(self, model, messages, temperature=None):
-        if model == "qwen3:4b":
+        if model in {"qwen3:8b", "qwen3:4b"}:
             raise RuntimeError("model not installed")
         return f"{model}:{messages[-1].content}"
 
@@ -46,7 +46,7 @@ def test_router_prefers_coder_for_code_query(tmp_path, monkeypatch):
     router = JarvisRouter(FakeOllama(), MemoryManager(), FakeKnowledge())
     response = router.complete("jarvis", [ChatMessage(role="user", content="Analise este código Python")])
 
-    assert "qwen3:4b" in response
+    assert "qwen3:8b" in response
 
 
 def test_router_falls_back_to_installed_ollama_model(tmp_path, monkeypatch):

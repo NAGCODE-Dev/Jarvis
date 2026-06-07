@@ -8,6 +8,12 @@ Jarvis is a local-first personal assistant for Ubuntu Linux. This repository con
 - local knowledge ingestion for RAG
 - VS Code Continue configuration for local coding workflows
 
+Default model profile in this repo prioritizes quality over speed:
+
+- planning/general: `gemma4:e4b`
+- coding: `qwen3:8b`
+- fallbacks: `gemma4:e2b`, `qwen3:4b`, `qwen3:1.7b`
+
 ## Quick start
 
 1. Run `scripts/install_host.sh`

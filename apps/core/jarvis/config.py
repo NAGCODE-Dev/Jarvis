@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     planner_model: str = "gemma4:e4b"
     planner_fallback_model: str = "gemma4:e2b"
-    coder_model: str = "qwen3:4b"
+    coder_model: str = "qwen3:8b"
     coder_fallback_model: str = "qwen3:1.7b"
     embedding_model: str = "nomic-embed-text"
 
