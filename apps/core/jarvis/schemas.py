@@ -1,0 +1,76 @@
+from __future__ import annotations
+
+from datetime import datetime
+from typing import Any, Literal
+
+from pydantic import BaseModel, Field
+
+
+class ChatMessage(BaseModel):
+    role: Literal["system", "user", "assistant", "tool"]
+    content: str
+
+
+class ChatCompletionRequest(BaseModel):
+    model: str
+    messages: list[ChatMessage]
+    stream: bool = False
+    temperature: float | None = None
+    max_tokens: int | None = None
+
+
+class EmbeddingRequest(BaseModel):
+    model: str | None = None
+    input: str | list[str]
+
+
+class MemoryFactRequest(BaseModel):
+    section: str = Field(description="Logical namespace, e.g. profile, preferences, goals or constraints.")
+    key: str
+    value: Any
+    source: str | None = None
+
+
+class StateUpdateRequest(BaseModel):
+    field: str
+    value: Any
+    source: str | None = None
+
+
+class WorkspaceMemoryRequest(BaseModel):
+    workspace: str
+    field: str
+    value: Any
+    source: str | None = None
+
+
+class TimelineEntryRequest(BaseModel):
+    event: str
+    happened_at: datetime | None = None
+
+
+class SummarizeMemoryRequest(BaseModel):
+    scope: Literal["current", "all"] = "current"
+    label: str | None = None
+
+
+class KnowledgeIndexRequest(BaseModel):
+    domains: list[str] | None = None
+    force: bool = False
+
+
+class KnowledgeSearchRequest(BaseModel):
+    query: str
+    domain: str | None = None
+    top_k: int = 5
+    score_threshold: float | None = None
+
+
+class SearchResult(BaseModel):
+    score: float
+    text: str
+    metadata: dict[str, Any]
+
+
+class BenchmarkRequest(BaseModel):
+    models: list[str] | None = None

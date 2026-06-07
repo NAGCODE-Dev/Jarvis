@@ -1,0 +1,31 @@
+{
+  "profile.name": {
+    "value": "unknown",
+    "created_at": "2026-06-07T00:00:00+00:00",
+    "updated_at": "2026-06-07T00:00:00+00:00",
+    "source": "bootstrap",
+    "namespace": "profile"
+  },
+  "preferences.response_style": {
+    "value": "concise and practical",
+    "created_at": "2026-06-07T00:00:00+00:00",
+    "updated_at": "2026-06-07T00:00:00+00:00",
+    "source": "bootstrap",
+    "namespace": "preferences"
+  },
+  "goals.jarvis": {
+    "value": "bootstrap a usable local Jarvis",
+    "created_at": "2026-06-07T00:00:00+00:00",
+    "updated_at": "2026-06-07T00:00:00+00:00",
+    "source": "bootstrap",
+    "namespace": "goals"
+  },
+  "constraints.hardware": {
+    "value": "CPU only, 16 GB RAM, no dedicated GPU",
+    "created_at": "2026-06-07T00:00:00+00:00",
+    "updated_at": "2026-06-07T00:00:00+00:00",
+    "source": "bootstrap",
+    "namespace": "constraints"
+  }
+}
+

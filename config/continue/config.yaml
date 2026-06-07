@@ -1,0 +1,37 @@
+name: Jarvis Local
+version: 0.0.1
+schema: v1
+
+models:
+  - name: Jarvis Programador
+    provider: openai
+    model: jarvis-programador
+    apiBase: http://127.0.0.1:8000/v1
+    apiKey: local
+    roles:
+      - chat
+      - edit
+      - apply
+
+  - name: Jarvis Geral
+    provider: openai
+    model: jarvis
+    apiBase: http://127.0.0.1:8000/v1
+    apiKey: local
+    roles:
+      - chat
+
+  - name: Qwen Autocomplete Local
+    provider: ollama
+    model: qwen3:1.7b
+    apiBase: http://127.0.0.1:11434
+    roles:
+      - autocomplete
+
+  - name: Nomic Embed Local
+    provider: ollama
+    model: nomic-embed-text
+    apiBase: http://127.0.0.1:11434
+    roles:
+      - embed
+

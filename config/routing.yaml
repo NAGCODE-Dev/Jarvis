@@ -1,0 +1,21 @@
+default_agent: jarvis
+visible_models:
+  - jarvis
+  - jarvis-coach
+  - jarvis-professor
+  - jarvis-programador
+  - jarvis-pesquisador
+routes:
+  coding:
+    keywords: [codigo, código, debug, bug, architecture, arquitetura, python, typescript]
+    agent: jarvis-programador
+  coaching:
+    keywords: [treino, crossfit, musculacao, musculação, workout, periodizacao, periodização]
+    agent: jarvis-coach
+  studies:
+    keywords: [estudo, faculdade, resumo, prova, study]
+    agent: jarvis-professor
+  research:
+    keywords: [documento, pdf, knowledge, artigo, base de conhecimento]
+    agent: jarvis-pesquisador
+

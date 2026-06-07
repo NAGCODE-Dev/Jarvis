@@ -1,0 +1,30 @@
+{
+  "qwen3:4b": {
+    "coding": 10,
+    "planning": 7,
+    "reasoning": 8,
+    "general": 7
+  },
+  "qwen3:1.7b": {
+    "coding": 7,
+    "planning": 5,
+    "reasoning": 5,
+    "general": 5
+  },
+  "gemma4:e4b": {
+    "coding": 6,
+    "planning": 10,
+    "reasoning": 9,
+    "general": 9
+  },
+  "gemma4:e2b": {
+    "coding": 4,
+    "planning": 7,
+    "reasoning": 6,
+    "general": 6
+  },
+  "nomic-embed-text": {
+    "embeddings": 10
+  }
+}
+

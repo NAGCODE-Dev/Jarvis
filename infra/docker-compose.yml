@@ -1,0 +1,36 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:v1.15.3
+    container_name: jarvis-qdrant
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6333:6333"
+      - "127.0.0.1:6334:6334"
+    volumes:
+      - ../data/qdrant:/qdrant/storage
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: jarvis-open-webui
+    restart: unless-stopped
+    depends_on:
+      - qdrant
+    ports:
+      - "127.0.0.1:3000:8080"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      WEBUI_AUTH: "False"
+      ENABLE_SIGNUP: "False"
+      OPENAI_API_BASE_URL: "http://host.docker.internal:8000/v1"
+      OPENAI_API_KEY: "local"
+      RAG_EMBEDDING_ENGINE: "openai"
+      RAG_OPENAI_API_BASE_URL: "http://host.docker.internal:8000/v1"
+      RAG_OPENAI_API_KEY: "local"
+      RAG_EMBEDDING_MODEL: "nomic-embed-text"
+      VECTOR_DB: "qdrant"
+      QDRANT_URI: "http://qdrant:6333"
+      DEFAULT_MODELS: "jarvis"
+    volumes:
+      - ../data/open-webui:/app/backend/data
+

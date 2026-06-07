@@ -1,0 +1,10 @@
+{
+  "installed": [
+    "gemma4:e4b",
+    "gemma4:e2b",
+    "qwen3:4b",
+    "qwen3:1.7b",
+    "nomic-embed-text"
+  ]
+}
+

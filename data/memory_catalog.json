@@ -1,0 +1,20 @@
+{
+  "profile.name": {
+    "source": "data/identity/profile.md",
+    "updated_at": "2026-06-07T00:00:00+00:00",
+    "action": "set_identity_fact",
+    "workspace": null
+  },
+  "weight.current_kg": {
+    "source": "/home/nikolasa/Downloads/Jarvis/data/state/current.md",
+    "updated_at": "2026-06-07T22:41:22+00:00",
+    "action": "update_state",
+    "workspace": null
+  },
+  "current_focus": {
+    "source": "/home/nikolasa/Downloads/Jarvis/data/memory/workspaces/jarvis/current.md",
+    "updated_at": "2026-06-07T22:42:00+00:00",
+    "action": "append_workspace_note",
+    "workspace": "jarvis"
+  }
+}
