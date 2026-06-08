@@ -1,19 +1,43 @@
 {
   "profile.name": {
-    "source": "data/identity/profile.md",
-    "updated_at": "2026-06-07T00:00:00+00:00",
+    "source": "/home/nikolasa/Downloads/Jarvis/data/identity/profile.md",
+    "updated_at": "2026-06-08T00:16:45+00:00",
     "action": "set_identity_fact",
     "workspace": null
   },
   "weight.current_kg": {
     "source": "/home/nikolasa/Downloads/Jarvis/data/state/current.md",
-    "updated_at": "2026-06-07T22:41:22+00:00",
+    "updated_at": "2026-06-08T00:16:48+00:00",
     "action": "update_state",
     "workspace": null
   },
   "current_focus": {
     "source": "/home/nikolasa/Downloads/Jarvis/data/memory/workspaces/jarvis/current.md",
-    "updated_at": "2026-06-07T22:42:00+00:00",
+    "updated_at": "2026-06-08T00:16:49+00:00",
+    "action": "append_workspace_note",
+    "workspace": "jarvis"
+  },
+  "preferences.editor": {
+    "source": "/home/nikolasa/Downloads/Jarvis/data/identity/preferences.md",
+    "updated_at": "2026-06-08T00:16:45+00:00",
+    "action": "update_preference",
+    "workspace": null
+  },
+  "preferences.response_style": {
+    "source": "/home/nikolasa/Downloads/Jarvis/data/identity/preferences.md",
+    "updated_at": "2026-06-08T00:16:46+00:00",
+    "action": "update_preference",
+    "workspace": null
+  },
+  "constraints.hardware": {
+    "source": "/home/nikolasa/Downloads/Jarvis/data/identity/constraints.md",
+    "updated_at": "2026-06-08T00:16:47+00:00",
+    "action": "update_constraint",
+    "workspace": null
+  },
+  "project_type": {
+    "source": "/home/nikolasa/Downloads/Jarvis/data/memory/workspaces/jarvis/current.md",
+    "updated_at": "2026-06-08T00:16:49+00:00",
     "action": "append_workspace_note",
     "workspace": "jarvis"
   }

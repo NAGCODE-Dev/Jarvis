@@ -38,11 +38,16 @@ class Settings(BaseSettings):
     embedding_model: str = "nomic-embed-text"
 
     default_response_language: Literal["auto", "pt-BR", "en"] = "auto"
+    model_selection_strategy: Literal["quality", "balanced", "speed"] = "quality"
     max_search_results: int = 6
     memory_archive_days: int = 30
     benchmark_timeout_seconds: float = 120.0
     memory_catalog_filename: str = "memory_catalog.json"
     allow_local_embedding_fallback: bool = True
+    model_memory_safety_ratio: float = 0.75
+    model_quality_latency_soft_cap_ms: float = 45000.0
+    model_balanced_latency_soft_cap_ms: float = 25000.0
+    model_speed_latency_soft_cap_ms: float = 12000.0
 
     @property
     def identity_dir(self) -> Path:

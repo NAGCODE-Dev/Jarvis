@@ -14,15 +14,17 @@ Default model profile in this repo prioritizes quality over speed:
 - coding: `qwen3:8b`
 - fallbacks: `gemma4:e2b`, `qwen3:4b`, `qwen3:1.7b`
 
+Runtime model selection is controlled by `JARVIS_MODEL_SELECTION_STRATEGY`:
+
+- `quality`: prefer stronger models unless benchmark/RAM say otherwise
+- `balanced`: trade off capability and latency
+- `speed`: prefer faster models when benchmark shows a large latency gap
+
 ## Quick start
 
-1. Run `scripts/install_host.sh`
-2. Run `scripts/pull_models.sh`
-3. Start infra with `scripts/start_infra.sh`
-4. Start the backend with `scripts/run_core.sh`
-5. Open `http://localhost:3000` for Open WebUI
-6. Run `scripts/benchmark_models.sh` to generate local model rankings
-7. Run `scripts/seed_demo.sh` if you want a first pre-populated context
+1. Run `scripts/first_run.sh`
+2. Open `http://localhost:3000` for Open WebUI when Docker/WebUI are available
+3. Open the project in VS Code and test Continue
 
 If Docker/Qdrant are unavailable, Jarvis still works in degraded local mode:
 
@@ -62,12 +64,25 @@ Continue configuration is in `config/continue/config.yaml`.
 Useful helper scripts:
 
 ```bash
+scripts/first_run.sh
+scripts/boot_local.sh
+scripts/verify_local.sh
+scripts/apply_quality_profile.sh
+scripts/continue_preflight.sh
+scripts/continue_smoke.sh
 scripts/start_infra.sh
+scripts/stop_core.sh
 scripts/stop_infra.sh
 scripts/status.sh
 scripts/seed_demo.sh
 scripts/show_context.sh --workspace jarvis
 scripts/memory_action.sh update_state weight.current_kg 72
+```
+
+To force the local environment to use the strongest default profile again:
+
+```bash
+scripts/apply_quality_profile.sh
 ```
 
 ## Structure
@@ -86,3 +101,32 @@ scripts/memory_action.sh update_state weight.current_kg 72
 - Qdrant-backed local RAG
 - benchmarked model rankings persisted in `data/benchmark/model_rankings.json`
 - CLI helpers for indexing, benchmark and memory/context inspection
+
+## VS Code / Continue
+
+Preflight:
+
+```bash
+scripts/boot_local.sh
+scripts/continue_preflight.sh
+scripts/continue_smoke.sh
+```
+
+Recommended manual validation:
+
+1. Run `scripts/first_run.sh`
+2. Open the workspace with `code /home/nikolasa/Downloads/Jarvis`
+3. Reload the VS Code window
+4. In Continue, use `Jarvis Programador Quality` for code tasks
+5. Try chat, edit/apply and autocomplete in a real project file
+
+Detailed checklist:
+
+- [CONTINUE_TESTS.md](/home/nikolasa/Downloads/Jarvis/CONTINUE_TESTS.md:1)
+
+Operational verification:
+
+```bash
+scripts/verify_local.sh
+scripts/verify_local.sh --rag-smoke
+```

@@ -1,9 +1,9 @@
-name: Jarvis Local
-version: 0.0.1
+name: Jarvis Local Quality
+version: 0.1.0
 schema: v1
 
 models:
-  - name: Jarvis Programador
+  - name: Jarvis Programador Quality
     provider: openai
     model: jarvis-programador
     apiBase: http://127.0.0.1:8000/v1
@@ -13,9 +13,17 @@ models:
       - edit
       - apply
 
-  - name: Jarvis Geral
+  - name: Jarvis Geral Quality
     provider: openai
     model: jarvis
+    apiBase: http://127.0.0.1:8000/v1
+    apiKey: local
+    roles:
+      - chat
+
+  - name: Jarvis Pesquisador
+    provider: openai
+    model: jarvis-pesquisador
     apiBase: http://127.0.0.1:8000/v1
     apiKey: local
     roles:
@@ -34,4 +42,3 @@ models:
     apiBase: http://127.0.0.1:11434
     roles:
       - embed
-

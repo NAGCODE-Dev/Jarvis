@@ -41,7 +41,11 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
     @router.get("/api/status")
     def status() -> dict[str, object]:
         service_status: dict[str, object] = {
-            "core": {"status": "ok", "app_name": settings.app_name},
+            "core": {
+                "status": "ok",
+                "app_name": settings.app_name,
+                "model_selection_strategy": settings.model_selection_strategy,
+            },
         }
         try:
             service_status["ollama"] = ollama.health()

@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 from jarvis.config import settings
+from jarvis.model_registry import ModelRegistry
 from jarvis.ollama_client import OllamaClient
 from jarvis.schemas import ChatMessage
 
@@ -21,12 +22,13 @@ class BenchmarkService:
             "planning": "Monte um plano curto de estudos para 3 dias.",
             "coding": "Explique um bug simples de Python e como corrigir.",
         }
-        models = models or [
-            settings.planner_model,
-            settings.planner_fallback_model,
-            settings.coder_model,
-            settings.coder_fallback_model,
-        ]
+        if models is None:
+            registry = ModelRegistry()
+            models = [
+                model
+                for model in registry.list_visible_models()
+                if "embed" not in model.lower()
+            ]
         results: dict[str, Any] = {}
         for model in models:
             measures = []
@@ -50,13 +52,14 @@ class BenchmarkService:
                         "tokens_per_second": round(tokens_estimate / max(elapsed, 0.001), 2),
                         "peak_rss_mb": round(max(rss_before, rss_after) / 1024.0, 2),
                     })
-                except Exception:
+                except Exception as exc:
                     stable = False
                     measures.append({
                         "task": task,
                         "latency_ms": None,
                         "tokens_per_second": 0.0,
                         "peak_rss_mb": round(resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 1024.0, 2),
+                        "error": str(exc),
                     })
             latencies = [m["latency_ms"] for m in measures if m["latency_ms"] is not None]
             throughputs = [m["tokens_per_second"] for m in measures]

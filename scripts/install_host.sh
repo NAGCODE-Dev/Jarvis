@@ -41,5 +41,6 @@ if [ ! -f "$ROOT_DIR/.env" ]; then
   cp "$ROOT_DIR/config/.env.example" "$ROOT_DIR/.env"
 fi
 
-echo "[jarvis] Done"
+"$ROOT_DIR/scripts/apply_quality_profile.sh"
 
+echo "[jarvis] Done"

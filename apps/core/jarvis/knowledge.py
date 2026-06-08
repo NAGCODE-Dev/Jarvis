@@ -45,14 +45,24 @@ class KnowledgeService:
             self.mode = "local"
             return QdrantClient(path=str(settings.qdrant_local_path))
 
-    def ensure_collection(self, vector_size: int | None = None) -> None:
+    def ensure_collection(self, vector_size: int | None = None, force_recreate: bool = False) -> None:
         collection = settings.qdrant_collection
-        existing = {c.name for c in self.client.get_collections().collections}
-        if collection in existing:
-            return
         if vector_size is None:
             sample = self.ollama.embed("jarvis vector dimension probe")[0]
             vector_size = len(sample)
+        existing = {c.name for c in self.client.get_collections().collections}
+        if collection in existing:
+            info = self.client.get_collection(collection)
+            current_size = self._collection_vector_size(info)
+            if current_size == vector_size:
+                return
+            if not force_recreate:
+                raise ValueError(
+                    f"Qdrant collection '{collection}' has vector size {current_size}, "
+                    f"but current embeddings use size {vector_size}. "
+                    "Re-run indexing with force=true to recreate the collection."
+                )
+            self.client.delete_collection(collection)
         self.client.create_collection(
             collection_name=collection,
             vectors_config=qm.VectorParams(size=vector_size, distance=qm.Distance.COSINE),
@@ -76,7 +86,8 @@ class KnowledgeService:
 
         indexed_files = 0
         indexed_chunks = 0
-        self.ensure_collection()
+        vector_size = len(self.ollama.embed("jarvis vector dimension probe")[0])
+        self.ensure_collection(vector_size=vector_size, force_recreate=force)
         for directory in targets:
             for file_path in directory.rglob("*"):
                 if file_path.suffix.lower() not in SUPPORTED_SUFFIXES or not file_path.is_file():
@@ -94,8 +105,8 @@ class KnowledgeService:
         return {"indexed_files": indexed_files, "indexed_chunks": indexed_chunks}
 
     def search(self, query: str, domain: str | None = None, top_k: int = 5, score_threshold: float | None = None) -> list[SearchResult]:
-        self.ensure_collection()
         vector = self.ollama.embed(query)[0]
+        self.ensure_collection(vector_size=len(vector), force_recreate=False)
         query_filter = None
         if domain:
             query_filter = qm.Filter(
@@ -178,3 +189,11 @@ class KnowledgeService:
                 break
             start = max(0, end - overlap)
         return chunks
+
+    def _collection_vector_size(self, info: object) -> int | None:
+        config = getattr(info, "config", None)
+        params = getattr(config, "params", None)
+        vectors = getattr(params, "vectors", None)
+        if hasattr(vectors, "size"):
+            return int(vectors.size)
+        return None

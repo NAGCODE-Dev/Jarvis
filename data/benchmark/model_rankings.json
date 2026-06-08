@@ -1,7 +1,163 @@
 {
+  "benchmarked_at": "2026-06-08T00:17:27+00:00",
+  "strategy": "quality",
+  "benchmark_status": "no_stable_models",
   "rankings": {
-    "coding_primary": ["qwen3:8b", "qwen3:4b", "qwen3:1.7b"],
-    "planning_primary": ["gemma4:e4b", "gemma4:e2b"],
-    "safe_fallback": ["qwen3:4b", "qwen3:1.7b", "gemma4:e2b"]
+    "coding_primary": [
+      "qwen3:8b",
+      "qwen3:4b",
+      "qwen3:1.7b"
+    ],
+    "planning_primary": [
+      "gemma4:e4b",
+      "gemma4:e2b"
+    ],
+    "safe_fallback": [
+      "qwen3:4b",
+      "qwen3:1.7b",
+      "gemma4:e2b"
+    ]
+  },
+  "models": {
+    "gemma4:e4b": {
+      "stable": false,
+      "first_token_latency_ms": 120000.0,
+      "median_latency_ms": 120000.0,
+      "tokens_per_second": 0.0,
+      "peak_rss_mb": 134.06,
+      "measures": [
+        {
+          "task": "general",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        },
+        {
+          "task": "planning",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        },
+        {
+          "task": "coding",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        }
+      ],
+      "benchmarked_at": "2026-06-08T00:17:27+00:00"
+    },
+    "gemma4:e2b": {
+      "stable": false,
+      "first_token_latency_ms": 120000.0,
+      "median_latency_ms": 120000.0,
+      "tokens_per_second": 0.0,
+      "peak_rss_mb": 134.06,
+      "measures": [
+        {
+          "task": "general",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        },
+        {
+          "task": "planning",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        },
+        {
+          "task": "coding",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        }
+      ],
+      "benchmarked_at": "2026-06-08T00:17:27+00:00"
+    },
+    "qwen3:8b": {
+      "stable": false,
+      "first_token_latency_ms": 120000.0,
+      "median_latency_ms": 120000.0,
+      "tokens_per_second": 0.0,
+      "peak_rss_mb": 134.06,
+      "measures": [
+        {
+          "task": "general",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        },
+        {
+          "task": "planning",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        },
+        {
+          "task": "coding",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        }
+      ],
+      "benchmarked_at": "2026-06-08T00:17:27+00:00"
+    },
+    "qwen3:4b": {
+      "stable": false,
+      "first_token_latency_ms": 120000.0,
+      "median_latency_ms": 120000.0,
+      "tokens_per_second": 0.0,
+      "peak_rss_mb": 134.06,
+      "measures": [
+        {
+          "task": "general",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        },
+        {
+          "task": "planning",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        },
+        {
+          "task": "coding",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        }
+      ],
+      "benchmarked_at": "2026-06-08T00:17:27+00:00"
+    },
+    "qwen3:1.7b": {
+      "stable": false,
+      "first_token_latency_ms": 120000.0,
+      "median_latency_ms": 120000.0,
+      "tokens_per_second": 0.0,
+      "peak_rss_mb": 134.06,
+      "measures": [
+        {
+          "task": "general",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        },
+        {
+          "task": "planning",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        },
+        {
+          "task": "coding",
+          "latency_ms": null,
+          "tokens_per_second": 0.0,
+          "peak_rss_mb": 134.06
+        }
+      ],
+      "benchmarked_at": "2026-06-08T00:17:27+00:00"
+    }
   }
 }
