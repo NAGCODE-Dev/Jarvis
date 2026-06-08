@@ -1,0 +1,19 @@
+{
+  "id": "e2d98895d6cd4a9f8a38f1a46e7ecf3a",
+  "title": "[WORKSPACE: jarvis]",
+  "model": "jarvis-safe",
+  "workspace": "jarvis",
+  "created_at": "2026-06-08T18:50:39+00:00",
+  "updated_at": "2026-06-08T18:50:39+00:00",
+  "messages": [
+    {
+      "role": "user",
+      "content": "[WORKSPACE: jarvis]\noi",
+      "display_content": "Oi limpo"
+    },
+    {
+      "role": "assistant",
+      "content": "ok"
+    }
+  ]
+}

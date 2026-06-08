@@ -16,16 +16,22 @@ from jarvis.ollama_client import OllamaClient
 from jarvis.router import JarvisRouter
 from jarvis.schemas import (
     BenchmarkRequest,
+    ChatMessage,
     ChatCompletionRequest,
     EmbeddingRequest,
+    KnowledgeIngestNoteRequest,
     KnowledgeIndexRequest,
     KnowledgeSearchRequest,
     MemoryFactRequest,
     StateUpdateRequest,
     SummarizeMemoryRequest,
+    SessionCreateRequest,
+    SessionMessageRequest,
+    SessionUpdateRequest,
     TimelineEntryRequest,
     WorkspaceMemoryRequest,
 )
+from jarvis.sessions import SessionStore
 
 
 def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: KnowledgeService) -> APIRouter:
@@ -33,10 +39,23 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
     jarvis = JarvisRouter(ollama=ollama, memory=memory, knowledge=knowledge)
     benchmarks = BenchmarkService(ollama=ollama)
     registry = ModelRegistry()
+    sessions = SessionStore()
 
     @router.get("/health")
     def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @router.get("/v1")
+    @router.get("/v1/")
+    def openai_root() -> dict[str, object]:
+        return {
+            "object": "service",
+            "service": "jarvis-openai-compatible",
+            "status": "ok",
+            "models_url": "/v1/models",
+            "chat_completions_url": "/v1/chat/completions",
+            "embeddings_url": "/v1/embeddings",
+        }
 
     @router.get("/api/status")
     def status() -> dict[str, object]:
@@ -68,8 +87,8 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
         return service_status
 
     @router.get("/v1/models")
-    def list_models() -> dict[str, list[dict[str, str]]]:
-        return {"data": jarvis.list_models()}
+    def list_models() -> dict[str, object]:
+        return {"object": "list", "data": jarvis.list_models()}
 
     @router.post("/v1/chat/completions")
     def create_chat_completion(request: ChatCompletionRequest):
@@ -189,6 +208,17 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
         result = knowledge.index_domains(domains=request.domains, force=request.force)
         return {"status": "ok", **result}
 
+    @router.post("/api/knowledge/ingest-note")
+    def ingest_knowledge_note(request: KnowledgeIngestNoteRequest):
+        result = knowledge.ingest_note(
+            domain=request.domain,
+            title=request.title,
+            content=request.content,
+            source_path=request.source_path,
+            force=request.force,
+        )
+        return {"status": "ok", **result}
+
     @router.post("/api/knowledge/search")
     def search_knowledge(request: KnowledgeSearchRequest):
         results = knowledge.search(
@@ -208,5 +238,56 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
     @router.get("/api/models/rankings")
     def get_model_rankings():
         return {"status": "ok", "rankings": registry.get_rankings()}
+
+    @router.get("/api/chat/sessions")
+    def list_chat_sessions():
+        return {"status": "ok", "sessions": sessions.list_sessions()}
+
+    @router.post("/api/chat/sessions")
+    def create_chat_session(request: SessionCreateRequest):
+        session = sessions.create_session(title=request.title, model=request.model, workspace=request.workspace)
+        return {"status": "ok", "session": session}
+
+    @router.get("/api/chat/sessions/{session_id}")
+    def get_chat_session(session_id: str):
+        return {"status": "ok", "session": sessions.get_session(session_id)}
+
+    @router.put("/api/chat/sessions/{session_id}")
+    def update_chat_session(session_id: str, request: SessionUpdateRequest):
+        session = sessions.get_session(session_id)
+        if request.title is not None:
+            session["title"] = request.title
+        if request.model is not None:
+            session["model"] = request.model
+        if request.workspace is not None:
+            session["workspace"] = request.workspace
+        if request.messages is not None:
+            session["messages"] = [message.model_dump() for message in request.messages]
+        return {"status": "ok", "session": sessions.save_session(session_id, session)}
+
+    @router.delete("/api/chat/sessions/{session_id}")
+    def delete_chat_session(session_id: str):
+        sessions.delete_session(session_id)
+        return {"status": "ok"}
+
+    @router.post("/api/chat/sessions/{session_id}/message")
+    def create_chat_session_message(session_id: str, request: SessionMessageRequest):
+        session = sessions.get_session(session_id)
+        user_content = request.content
+        if request.workspace:
+            user_content = f"[WORKSPACE: {request.workspace}]\n{user_content}"
+        existing_messages = session.get("messages", [])
+        messages = [ChatMessage.model_validate(message) for message in existing_messages]
+        messages.append(ChatMessage(role="user", content=user_content))
+        content = jarvis.complete(request.model, messages, temperature=request.temperature)
+        updated = sessions.append_exchange(
+            session_id,
+            user_content=user_content,
+            user_display_content=request.display_content,
+            assistant_content=content,
+            model=request.model,
+            workspace=request.workspace,
+        )
+        return {"status": "ok", "session": updated, "message": content}
 
     return router

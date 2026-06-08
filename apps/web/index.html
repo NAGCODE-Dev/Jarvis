@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#0d1713" />
+    <title>Jarvis Local</title>
+    <link rel="manifest" href="/app/manifest.webmanifest" />
+    <link rel="icon" href="/app/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/app/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">J</div>
+          <div>
+            <h1>Jarvis</h1>
+            <p>Local PWA</p>
+          </div>
+        </div>
+
+        <section class="panel">
+          <label for="model">Perfil</label>
+          <select id="model">
+            <option value="jarvis-safe">Jarvis Geral Safe</option>
+            <option value="jarvis-programador-safe">Jarvis Programador Safe</option>
+            <option value="jarvis-pesquisador-safe">Jarvis Pesquisador Safe</option>
+            <option value="jarvis">Jarvis Geral Quality</option>
+            <option value="jarvis-programador">Jarvis Programador Quality</option>
+            <option value="jarvis-pesquisador">Jarvis Pesquisador Quality</option>
+          </select>
+        </section>
+
+        <section class="panel">
+          <label for="workspace">Workspace</label>
+          <input id="workspace" placeholder="jarvis, faculdade, crossfit..." />
+          <small>Opcional. Adicionado ao prompt como contexto explícito.</small>
+        </section>
+
+        <section class="panel">
+          <button id="clear-chat" class="secondary">Limpar conversa</button>
+          <button id="new-chat" class="secondary">Nova conversa</button>
+          <button id="delete-chat" class="secondary danger">Excluir conversa</button>
+          <button id="install-app" class="secondary hidden">Instalar app</button>
+        </section>
+
+        <section class="panel">
+          <label for="session-title">Título da conversa</label>
+          <input id="session-title" placeholder="Nova conversa" />
+          <small>Você pode renomear a conversa atual.</small>
+        </section>
+
+        <section class="panel">
+          <label for="sessions">Conversas</label>
+          <div id="sessions" class="sessions-list"></div>
+        </section>
+
+        <section class="panel status-panel">
+          <h2>Status</h2>
+          <pre id="status">Carregando...</pre>
+        </section>
+      </aside>
+
+      <main class="chat-layout">
+        <header class="chat-header">
+          <div>
+            <h2>Chat local</h2>
+            <p>Use o perfil safe para resposta mais estável no seu hardware.</p>
+          </div>
+        </header>
+
+        <section id="messages" class="messages" aria-live="polite"></section>
+
+        <form id="chat-form" class="composer">
+          <textarea
+            id="prompt"
+            rows="3"
+            placeholder="Pergunte algo ao Jarvis..."
+            autocomplete="off"
+          ></textarea>
+          <div class="composer-actions">
+            <span id="hint">Shift+Enter cria nova linha</span>
+            <button id="send" type="submit">Enviar</button>
+          </div>
+        </form>
+      </main>
+    </div>
+
+    <template id="message-template">
+      <article class="message">
+        <div class="message-role"></div>
+        <div class="message-body"></div>
+      </article>
+    </template>
+
+    <script src="/app/app.js" type="module"></script>
+  </body>
+</html>

@@ -7,7 +7,7 @@ from jarvis.schemas import ChatMessage
 
 class FakeOllama:
     def list_models(self):
-        return {"models": [{"name": "qwen3:8b"}]}
+        return {"models": [{"name": "qwen3:8b"}, {"name": "qwen3:4b"}, {"name": "qwen3:1.7b"}]}
 
     def chat(self, model, messages, temperature=None):
         return f"{model}:{messages[-1].content}"
@@ -47,6 +47,22 @@ def test_router_prefers_coder_for_code_query(tmp_path, monkeypatch):
     response = router.complete("jarvis", [ChatMessage(role="user", content="Analise este código Python")])
 
     assert "qwen3:8b" in response
+
+
+def test_safe_router_uses_lighter_coder_profile(tmp_path, monkeypatch):
+    import jarvis.config as config_module
+    import jarvis.memory as memory_module
+    import jarvis.model_registry as registry_module
+
+    test_settings = config_module.Settings(data_dir=tmp_path / "data", config_dir=config_module.settings.config_dir)
+    monkeypatch.setattr(config_module, "settings", test_settings)
+    monkeypatch.setattr(memory_module, "settings", test_settings)
+    monkeypatch.setattr(registry_module, "settings", test_settings)
+
+    router = JarvisRouter(FakeOllama(), MemoryManager(), FakeKnowledge())
+    response = router.complete("jarvis-programador-safe", [ChatMessage(role="user", content="Analise este código Python")])
+
+    assert "qwen3:4b" in response
 
 
 def test_router_falls_back_to_installed_ollama_model(tmp_path, monkeypatch):

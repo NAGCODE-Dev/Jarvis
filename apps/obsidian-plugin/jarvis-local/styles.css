@@ -1,0 +1,42 @@
+.jarvis-chat-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 12px;
+}
+
+.jarvis-chat-toolbar,
+.jarvis-chat-composer {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.jarvis-chat-messages {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.jarvis-chat-message {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--background-modifier-border);
+  white-space: pre-wrap;
+}
+
+.jarvis-chat-message.is-user {
+  background: var(--background-secondary);
+}
+
+.jarvis-chat-message.is-assistant {
+  background: var(--background-primary-alt);
+}
+
+.jarvis-chat-composer textarea {
+  flex: 1;
+  min-height: 84px;
+  resize: vertical;
+}

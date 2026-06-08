@@ -92,7 +92,7 @@ class ModelRegistry:
         scored.sort(reverse=True)
         ordered = [model for _, model in scored]
 
-        for model in preferred:
+        for model in reversed(preferred):
             if model in text_models and model not in ordered:
                 ordered.insert(0, model)
 

@@ -95,6 +95,7 @@ class KnowledgeService:
                 chunks = self._file_to_chunks(file_path, force=force)
                 if not chunks:
                     continue
+                self._delete_existing_source(chunks[0].metadata["source_path"])
                 points = [
                     qm.PointStruct(id=chunk.point_id, vector=chunk.vector, payload={**chunk.metadata, "text": chunk.text})
                     for chunk in chunks
@@ -103,6 +104,40 @@ class KnowledgeService:
                 indexed_files += 1
                 indexed_chunks += len(chunks)
         return {"indexed_files": indexed_files, "indexed_chunks": indexed_chunks}
+
+    def ingest_note(
+        self,
+        *,
+        domain: str,
+        title: str,
+        content: str,
+        source_path: str | None = None,
+        force: bool = False,
+    ) -> dict[str, str | int]:
+        domain_path = settings.knowledge_dir / domain / "obsidian"
+        domain_path.mkdir(parents=True, exist_ok=True)
+        slug = self._slugify(title)
+        if source_path:
+            source_hash = sha256(source_path.encode("utf-8")).hexdigest()[:10]
+            slug = f"{slug}-{source_hash}"
+        note_path = domain_path / f"{slug}.md"
+        rendered = self._render_obsidian_note(title=title, content=content, source_path=source_path)
+        note_path.write_text(rendered, encoding="utf-8")
+        vector_size = len(self.ollama.embed("jarvis vector dimension probe")[0])
+        self.ensure_collection(vector_size=vector_size, force_recreate=force)
+        chunks = self._file_to_chunks(note_path, force=force)
+        if chunks:
+            self._delete_existing_source(chunks[0].metadata["source_path"])
+            points = [
+                qm.PointStruct(id=chunk.point_id, vector=chunk.vector, payload={**chunk.metadata, "text": chunk.text})
+                for chunk in chunks
+            ]
+            self.client.upsert(collection_name=settings.qdrant_collection, points=points)
+        return {
+            "stored_path": str(note_path.relative_to(settings.data_dir)),
+            "indexed_chunks": len(chunks),
+            "domain": domain,
+        }
 
     def search(self, query: str, domain: str | None = None, top_k: int = 5, score_threshold: float | None = None) -> list[SearchResult]:
         vector = self.ollama.embed(query)[0]
@@ -197,3 +232,24 @@ class KnowledgeService:
         if hasattr(vectors, "size"):
             return int(vectors.size)
         return None
+
+    def _delete_existing_source(self, source_path: str) -> None:
+        selector = qm.FilterSelector(
+            filter=qm.Filter(
+                must=[qm.FieldCondition(key="source_path", match=qm.MatchValue(value=source_path))]
+            )
+        )
+        self.client.delete(collection_name=settings.qdrant_collection, points_selector=selector)
+
+    def _render_obsidian_note(self, *, title: str, content: str, source_path: str | None) -> str:
+        indexed_at = datetime.now(UTC).replace(microsecond=0).isoformat()
+        parts = [f"# {title}", "", f"- indexed_at: {indexed_at}"]
+        if source_path:
+            parts.append(f"- obsidian_source_path: {source_path}")
+        parts.extend(["", content.strip(), ""])
+        return "\n".join(parts)
+
+    def _slugify(self, value: str) -> str:
+        cleaned = "".join(ch.lower() if ch.isalnum() else "-" for ch in value)
+        parts = [part for part in cleaned.split("-") if part]
+        return "-".join(parts)[:80] or "obsidian-note"

@@ -122,6 +122,10 @@ class Settings(BaseSettings):
         return self.config_dir / "prompts"
 
     @property
+    def web_dir(self) -> Path:
+        return ROOT_DIR / "apps" / "web"
+
+    @property
     def models_dir(self) -> Path:
         return self.data_dir / "models"
 
@@ -148,6 +152,10 @@ class Settings(BaseSettings):
     @property
     def benchmark_history_path(self) -> Path:
         return self.data_dir / "benchmark" / "benchmark_history.jsonl"
+
+    @property
+    def sessions_dir(self) -> Path:
+        return self.data_dir / "sessions"
 
 
 settings = Settings()

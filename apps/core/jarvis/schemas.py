@@ -59,6 +59,14 @@ class KnowledgeIndexRequest(BaseModel):
     force: bool = False
 
 
+class KnowledgeIngestNoteRequest(BaseModel):
+    domain: str
+    title: str
+    content: str
+    source_path: str | None = None
+    force: bool = False
+
+
 class KnowledgeSearchRequest(BaseModel):
     query: str
     domain: str | None = None
@@ -74,3 +82,24 @@ class SearchResult(BaseModel):
 
 class BenchmarkRequest(BaseModel):
     models: list[str] | None = None
+
+
+class SessionCreateRequest(BaseModel):
+    title: str | None = None
+    model: str = "jarvis-safe"
+    workspace: str | None = None
+
+
+class SessionUpdateRequest(BaseModel):
+    title: str | None = None
+    model: str | None = None
+    workspace: str | None = None
+    messages: list[ChatMessage] | None = None
+
+
+class SessionMessageRequest(BaseModel):
+    model: str
+    content: str
+    display_content: str | None = None
+    workspace: str | None = None
+    temperature: float | None = None

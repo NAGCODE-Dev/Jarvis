@@ -36,31 +36,40 @@ class JarvisRouter:
 
     def complete(self, visible_model: str, messages: list[ChatMessage], temperature: float | None = None) -> str:
         agent = AGENTS.get(visible_model, AGENTS["jarvis"])
-        if agent.visible_model == "jarvis":
-            decision = self._route(messages)
+        model_profile = self._model_profile(visible_model)
+        if agent.visible_model in {"jarvis", "jarvis-safe"}:
+            decision = self._route(messages, model_profile=model_profile)
         else:
             decision = RouteDecision(agent=agent, route_kind=agent.kind if agent.kind != "orchestrator" else "planner")
-        return self._dispatch(decision, messages, temperature=temperature)
+        return self._dispatch(decision, messages, temperature=temperature, model_profile=model_profile)
 
-    def _route(self, messages: list[ChatMessage]) -> RouteDecision:
+    def _model_profile(self, visible_model: str) -> Literal["safe", "quality"]:
+        return "safe" if visible_model.endswith("-safe") or visible_model == "jarvis-safe" else "quality"
+
+    def _route(self, messages: list[ChatMessage], model_profile: Literal["safe", "quality"] = "quality") -> RouteDecision:
         prompt = " ".join(message.content.lower() for message in messages if message.role == "user")
+        coach_agent = AGENTS["jarvis-coach"]
+        professor_agent = AGENTS["jarvis-professor"]
+        programmer_agent = AGENTS["jarvis-programador-safe"] if model_profile == "safe" else AGENTS["jarvis-programador"]
+        researcher_agent = AGENTS["jarvis-pesquisador-safe"] if model_profile == "safe" else AGENTS["jarvis-pesquisador"]
+        orchestrator_agent = AGENTS["jarvis-safe"] if model_profile == "safe" else AGENTS["jarvis"]
         if any(token in prompt for token in ("treino", "crossfit", "muscula", "periodização", "workout")):
             return RouteDecision(
-                agent=AGENTS["jarvis-coach"],
+                agent=coach_agent,
                 route_kind="coach",
                 workspace="crossfit",
                 context_fields=["weight.current_kg", "constraints.available_time", "goals.training_focus"],
             )
         if any(token in prompt for token in ("faculdade", "estudo", "resumo", "prova", "learn", "study")):
             return RouteDecision(
-                agent=AGENTS["jarvis-professor"],
+                agent=professor_agent,
                 route_kind="professor",
                 workspace="faculdade",
                 context_fields=["goals.study_focus", "preferences.response_style"],
             )
         if any(token in prompt for token in ("documento", "pdf", "arquivo", "base de conhecimento", "knowledge base", "artigo")):
             return RouteDecision(
-                agent=AGENTS["jarvis-pesquisador"],
+                agent=researcher_agent,
                 route_kind="researcher",
                 use_rag=True,
                 workspace=self._infer_workspace(prompt),
@@ -68,20 +77,20 @@ class JarvisRouter:
         if any(token in prompt for token in ("código", "codigo", "debug", "bug", "stack trace", "python", "typescript", "arquitetura", "refactor")):
             if any(token in prompt for token in ("planeje e implemente", "planejar e executar", "complexo", "arquitetar e codar")):
                 return RouteDecision(
-                    agent=AGENTS["jarvis-programador"],
+                    agent=programmer_agent,
                     route_kind="complex-coder",
                     workspace="programacao",
                     context_fields=["preferences.editor", "preferences.coding_style"],
                 )
             return RouteDecision(
-                agent=AGENTS["jarvis-programador"],
+                agent=programmer_agent,
                 route_kind="coder",
                 workspace="programacao",
                 context_fields=["preferences.editor", "preferences.coding_style"],
             )
         if any(token in prompt for token in ("peso", "altura", "idade", "aniversário", "birthday")):
-            return RouteDecision(agent=AGENTS["jarvis"], route_kind="planner", context_fields=["profile.name", "weight.current_kg", "profile.birth_date"])
-        return RouteDecision(agent=AGENTS["jarvis"], route_kind="planner", workspace=self._infer_workspace(prompt))
+            return RouteDecision(agent=orchestrator_agent, route_kind="planner", context_fields=["profile.name", "weight.current_kg", "profile.birth_date"])
+        return RouteDecision(agent=orchestrator_agent, route_kind="planner", workspace=self._infer_workspace(prompt))
 
     def _infer_workspace(self, prompt: str) -> str | None:
         for workspace in ("minecraft", "faculdade", "jarvis", "crossfit", "programacao"):
@@ -89,7 +98,13 @@ class JarvisRouter:
                 return workspace
         return None
 
-    def _dispatch(self, decision: RouteDecision, messages: list[ChatMessage], temperature: float | None = None) -> str:
+    def _dispatch(
+        self,
+        decision: RouteDecision,
+        messages: list[ChatMessage],
+        temperature: float | None = None,
+        model_profile: Literal["safe", "quality"] = "quality",
+    ) -> str:
         system_prompt = load_prompt(decision.agent.system_prompt_file)
         context = self.memory.resolve_context(fields=decision.context_fields, workspace=decision.workspace, include_archive=False)
         context_lines = [
@@ -127,7 +142,7 @@ class JarvisRouter:
                 )
 
         if decision.route_kind == "complex-coder":
-            planner_primary, planner_fallback = self.registry.resolve_primary("planning")
+            planner_primary, planner_fallback = self._resolve_primary("planning", decision.agent, model_profile)
             plan = self._call_with_fallback(
                 "planning",
                 planner_primary,
@@ -140,13 +155,25 @@ class JarvisRouter:
                 ChatMessage(role="system", content=f"Use this plan created by the planner model as guidance:\n{plan}"),
                 *messages,
             ]
-            coding_primary, coding_fallback = self.registry.resolve_primary("coding")
+            coding_primary, coding_fallback = self._resolve_primary("coding", decision.agent, model_profile)
             result = self._call_with_fallback("coding", coding_primary, coding_fallback, execution_messages, temperature=temperature)
             return f"Plan:\n{plan}\n\nExecution:\n{result}"
 
         task_type = "coding" if decision.route_kind in {"coder", "complex-coder"} else "planning"
-        primary, fallback = self.registry.resolve_primary(task_type)
+        primary, fallback = self._resolve_primary(task_type, decision.agent, model_profile)
         return self._call_with_fallback(task_type, primary, fallback, enriched_messages, temperature=temperature)
+
+    def _resolve_primary(
+        self,
+        task_type: str,
+        agent: AgentProfile,
+        model_profile: Literal["safe", "quality"],
+    ) -> tuple[str, str]:
+        if model_profile == "safe":
+            if task_type == "coding":
+                return agent.primary_model, agent.fallback_model
+            return agent.primary_model, agent.fallback_model
+        return self.registry.resolve_primary(task_type)
 
     def _call_with_fallback(
         self,

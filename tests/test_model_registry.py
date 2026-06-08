@@ -21,6 +21,7 @@ def test_registry_prefers_stronger_model_in_quality_mode(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(config_module, "settings", test_settings)
     monkeypatch.setattr(registry_module, "settings", test_settings)
+    monkeypatch.setattr(registry_module.ModelRegistry, "_available_memory_mb", lambda self: 16384.0)
 
     _write_json(
         test_settings.model_capabilities_path,
@@ -53,6 +54,7 @@ def test_registry_prefers_faster_model_in_speed_mode(tmp_path, monkeypatch):
     )
     monkeypatch.setattr(config_module, "settings", test_settings)
     monkeypatch.setattr(registry_module, "settings", test_settings)
+    monkeypatch.setattr(registry_module.ModelRegistry, "_available_memory_mb", lambda self: 16384.0)
 
     _write_json(
         test_settings.model_capabilities_path,
