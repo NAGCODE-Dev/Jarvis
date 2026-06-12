@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+import json
 from hashlib import sha256
 from typing import Any
 
@@ -44,7 +45,10 @@ class OllamaClient:
             "messages": [message.model_dump() for message in messages],
             "stream": False,
         }
+        if settings.ollama_keep_alive:
+            payload["keep_alive"] = settings.ollama_keep_alive
         merged_options = dict(options or {})
+        merged_options.setdefault("num_ctx", settings.ollama_num_ctx)
         if temperature is not None:
             merged_options["temperature"] = temperature
         if merged_options:
@@ -54,6 +58,41 @@ class OllamaClient:
         response.raise_for_status()
         data = response.json()
         return data["message"]["content"]
+
+    def chat_stream(
+        self,
+        model: str,
+        messages: Iterable[ChatMessage],
+        *,
+        temperature: float | None = None,
+        options: dict[str, Any] | None = None,
+    ):
+        payload: dict[str, Any] = {
+            "model": model,
+            "messages": [message.model_dump() for message in messages],
+            "stream": True,
+        }
+        if settings.ollama_keep_alive:
+            payload["keep_alive"] = settings.ollama_keep_alive
+        merged_options = dict(options or {})
+        merged_options.setdefault("num_ctx", settings.ollama_num_ctx)
+        if temperature is not None:
+            merged_options["temperature"] = temperature
+        if merged_options:
+            payload["options"] = merged_options
+
+        with self._client.stream("POST", "/api/chat", json=payload) as response:
+            response.raise_for_status()
+            for line in response.iter_lines():
+                if not line:
+                    continue
+                if isinstance(line, bytes):
+                    line = line.decode("utf-8")
+                data = json.loads(line)
+                message = data.get("message", {})
+                chunk = message.get("content", "")
+                if chunk:
+                    yield chunk
 
     def embed(self, text: str | list[str], model: str | None = None) -> list[list[float]]:
         payload = {

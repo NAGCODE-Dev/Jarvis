@@ -2,11 +2,20 @@
 
 Plugin local do Obsidian para falar direto com a API do Jarvis.
 
+O chat lateral prefere streaming quando o runtime do Obsidian suporta `fetch` com stream. Se não suportar, ele faz fallback automático para resposta tradicional.
+
 ## Recursos
 
 - chat lateral dentro do Obsidian
 - chat com contexto opcional da nota atual
 - chat lateral usando sessões persistidas do Jarvis
+- lista de sessões no próprio chat lateral
+- busca local de sessões no próprio chat lateral
+- renomeação rápida da sessão ativa
+- ações rápidas no painel para nota atual, seleção, resumo, pesquisa e exportação
+- ação por mensagem para salvar uma resposta específica do Jarvis como nota derivada
+- ação por mensagem para inserir uma resposta específica diretamente na nota ativa
+- anexos no composer do chat para nota atual e seleção atual antes do envio
 - comando para verificar conexão com o Jarvis
 - comando para conversar sobre a nota atual
 - comando para pesquisar com base local do Jarvis
@@ -18,6 +27,7 @@ Plugin local do Obsidian para falar direto com a API do Jarvis.
 - comando para salvar a nota atual na memória do workspace
 - comando para sincronizar a nota atual com a base de conhecimento do Jarvis
 - comando para sincronizar em lote a pasta atual do Obsidian com a base de conhecimento
+- comando para exportar a sessão atual do chat para uma nota Markdown
 
 ## Instalação
 

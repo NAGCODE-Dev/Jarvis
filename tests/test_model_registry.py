@@ -110,3 +110,42 @@ def test_registry_preserves_previous_rankings_when_benchmark_has_no_stable_model
     saved = registry.get_rankings()
     assert saved["benchmark_status"] == "no_stable_models"
     assert saved["rankings"]["coding_primary"] == ["qwen3:8b", "qwen3:4b"]
+
+
+def test_resolve_primary_ignores_stale_rankings_when_strategy_changes(tmp_path, monkeypatch):
+    import jarvis.config as config_module
+    import jarvis.model_registry as registry_module
+
+    test_settings = config_module.Settings(
+        data_dir=tmp_path / "data",
+        config_dir=config_module.settings.config_dir,
+        model_selection_strategy="speed",
+        planner_model="qwen2.5:3b",
+        planner_fallback_model="qwen3:1.7b",
+        coder_model="qwen2.5-coder:1.5b",
+        coder_fallback_model="qwen2.5:3b",
+        safe_model="qwen2.5:3b",
+        safe_fallback_model="qwen3:1.7b",
+    )
+    monkeypatch.setattr(config_module, "settings", test_settings)
+    monkeypatch.setattr(registry_module, "settings", test_settings)
+
+    _write_json(
+        test_settings.model_rankings_path,
+        {
+            "strategy": "quality",
+            "benchmark_status": "no_stable_models",
+            "rankings": {
+                "coding_primary": ["qwen3:8b", "qwen3:4b"],
+                "planning_primary": ["gemma4:e4b", "gemma4:e2b"],
+                "safe_fallback": ["qwen3:4b", "gemma4:e2b"],
+            },
+        },
+    )
+
+    registry = registry_module.ModelRegistry()
+    planning = registry.resolve_primary("planning")
+    coding = registry.resolve_primary("coding")
+
+    assert planning == ("qwen2.5:3b", "qwen3:1.7b")
+    assert coding == ("qwen2.5-coder:1.5b", "qwen2.5:3b")

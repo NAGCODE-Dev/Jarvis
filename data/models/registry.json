@@ -1,9 +1,7 @@
 {
   "installed": [
-    "gemma4:e4b",
-    "gemma4:e2b",
-    "qwen3:8b",
-    "qwen3:4b",
+    "qwen2.5:3b",
+    "qwen2.5-coder:1.5b",
     "qwen3:1.7b",
     "nomic-embed-text"
   ]

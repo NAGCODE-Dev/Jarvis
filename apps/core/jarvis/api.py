@@ -4,7 +4,7 @@ import json
 import time
 from uuid import uuid4
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from jarvis.benchmark import BenchmarkService
@@ -40,6 +40,12 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
     benchmarks = BenchmarkService(ollama=ollama)
     registry = ModelRegistry()
     sessions = SessionStore()
+
+    def require_session(session_id: str) -> dict[str, object]:
+        try:
+            return sessions.get_session(session_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=f"Session not found: {session_id}") from exc
 
     @router.get("/health")
     def health() -> dict[str, str]:
@@ -80,6 +86,7 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
                 "status": "ok",
                 "identity_facts": len(context["identity"]),
                 "state_facts": len(context["state"]),
+                "hierarchical": memory.hierarchical_status(),
             }
         except Exception as exc:
             service_status["memory"] = {"status": "error", "detail": str(exc)}
@@ -92,8 +99,55 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
 
     @router.post("/v1/chat/completions")
     def create_chat_completion(request: ChatCompletionRequest):
-        content = jarvis.complete(request.model, request.messages, temperature=request.temperature)
         created = int(time.time())
+        if request.stream:
+            def event_stream():
+                response_id = f"chatcmpl-{uuid4().hex}"
+                try:
+                    for chunk_text in jarvis.complete_stream(request.model, request.messages, temperature=request.temperature):
+                        chunk = {
+                            "id": response_id,
+                            "object": "chat.completion.chunk",
+                            "created": created,
+                            "model": request.model,
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "delta": {"content": chunk_text},
+                                    "finish_reason": None,
+                                }
+                            ],
+                        }
+                        yield f"data: {json.dumps(chunk)}\n\n"
+                    chunk = {
+                        "id": response_id,
+                        "object": "chat.completion.chunk",
+                        "created": created,
+                        "model": request.model,
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": {},
+                                "finish_reason": "stop",
+                            }
+                        ],
+                    }
+                    yield f"data: {json.dumps(chunk)}\n\n"
+                    yield "data: [DONE]\n\n"
+                except Exception as exc:
+                    error_chunk = {
+                        "id": response_id,
+                        "object": "error",
+                        "created": created,
+                        "model": request.model,
+                        "error": {"message": str(exc)},
+                    }
+                    yield f"data: {json.dumps(error_chunk)}\n\n"
+                    yield "data: [DONE]\n\n"
+
+            return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+        content = jarvis.complete(request.model, request.messages, temperature=request.temperature)
         response = {
             "id": f"chatcmpl-{uuid4().hex}",
             "object": "chat.completion",
@@ -107,27 +161,7 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
                 }
             ],
         }
-        if not request.stream:
-            return response
-
-        def event_stream():
-            chunk = {
-                "id": response["id"],
-                "object": "chat.completion.chunk",
-                "created": created,
-                "model": request.model,
-                "choices": [
-                    {
-                        "index": 0,
-                        "delta": {"role": "assistant", "content": content},
-                        "finish_reason": "stop",
-                    }
-                ],
-            }
-            yield f"data: {json.dumps(chunk)}\n\n"
-            yield "data: [DONE]\n\n"
-
-        return StreamingResponse(event_stream(), media_type="text/event-stream")
+        return response
 
     @router.post("/v1/embeddings")
     def create_embeddings(request: EmbeddingRequest):
@@ -201,7 +235,11 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
 
     @router.get("/api/memory/context")
     def get_context(workspace: str | None = None):
-        return {"status": "ok", "context": memory.resolve_context(workspace=workspace)}
+        return {
+            "status": "ok",
+            "context": memory.resolve_context(workspace=workspace),
+            "hierarchical": memory.hierarchical_status(),
+        }
 
     @router.post("/api/knowledge/index")
     def index_knowledge(request: KnowledgeIndexRequest):
@@ -250,29 +288,30 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
 
     @router.get("/api/chat/sessions/{session_id}")
     def get_chat_session(session_id: str):
-        return {"status": "ok", "session": sessions.get_session(session_id)}
+        return {"status": "ok", "session": require_session(session_id)}
 
     @router.put("/api/chat/sessions/{session_id}")
     def update_chat_session(session_id: str, request: SessionUpdateRequest):
-        session = sessions.get_session(session_id)
-        if request.title is not None:
+        session = require_session(session_id)
+        if "title" in request.model_fields_set:
             session["title"] = request.title
-        if request.model is not None:
+        if "model" in request.model_fields_set and request.model is not None:
             session["model"] = request.model
-        if request.workspace is not None:
+        if "workspace" in request.model_fields_set:
             session["workspace"] = request.workspace
-        if request.messages is not None:
-            session["messages"] = [message.model_dump() for message in request.messages]
+        if "messages" in request.model_fields_set:
+            session["messages"] = [message.model_dump() for message in (request.messages or [])]
         return {"status": "ok", "session": sessions.save_session(session_id, session)}
 
     @router.delete("/api/chat/sessions/{session_id}")
     def delete_chat_session(session_id: str):
+        require_session(session_id)
         sessions.delete_session(session_id)
         return {"status": "ok"}
 
     @router.post("/api/chat/sessions/{session_id}/message")
     def create_chat_session_message(session_id: str, request: SessionMessageRequest):
-        session = sessions.get_session(session_id)
+        session = require_session(session_id)
         user_content = request.content
         if request.workspace:
             user_content = f"[WORKSPACE: {request.workspace}]\n{user_content}"
@@ -288,6 +327,58 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
             model=request.model,
             workspace=request.workspace,
         )
+        memory.record_exchange(
+            user_content=user_content,
+            user_display_content=request.display_content,
+            assistant_content=content,
+            model=request.model,
+            workspace=request.workspace,
+        )
         return {"status": "ok", "session": updated, "message": content}
+
+    @router.post("/api/chat/sessions/{session_id}/message/stream")
+    def create_chat_session_message_stream(session_id: str, request: SessionMessageRequest):
+        session = require_session(session_id)
+        user_content = request.content
+        if request.workspace:
+            user_content = f"[WORKSPACE: {request.workspace}]\n{user_content}"
+        existing_messages = session.get("messages", [])
+        messages = [ChatMessage.model_validate(message) for message in existing_messages]
+        messages.append(ChatMessage(role="user", content=user_content))
+
+        def event_stream():
+            assistant_parts: list[str] = []
+            try:
+                start_payload = {"type": "start", "session_id": session_id, "model": request.model}
+                yield f"data: {json.dumps(start_payload)}\n\n"
+                for chunk in jarvis.complete_stream(request.model, messages, temperature=request.temperature):
+                    assistant_parts.append(chunk)
+                    payload = {"type": "chunk", "delta": chunk}
+                    yield f"data: {json.dumps(payload)}\n\n"
+                assistant_content = "".join(assistant_parts)
+                updated = sessions.append_exchange(
+                    session_id,
+                    user_content=user_content,
+                    user_display_content=request.display_content,
+                    assistant_content=assistant_content,
+                    model=request.model,
+                    workspace=request.workspace,
+                )
+                memory.record_exchange(
+                    user_content=user_content,
+                    user_display_content=request.display_content,
+                    assistant_content=assistant_content,
+                    model=request.model,
+                    workspace=request.workspace,
+                )
+                done_payload = {"type": "done", "session": updated, "message": assistant_content}
+                yield f"data: {json.dumps(done_payload)}\n\n"
+                yield "data: [DONE]\n\n"
+            except Exception as exc:
+                error_payload = {"type": "error", "detail": str(exc)}
+                yield f"data: {json.dumps(error_payload)}\n\n"
+                yield "data: [DONE]\n\n"
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
 
     return router

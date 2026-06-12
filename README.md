@@ -8,11 +8,12 @@ Jarvis is a local-first personal assistant for Ubuntu Linux. This repository con
 - local knowledge ingestion for RAG
 - VS Code Continue configuration for local coding workflows
 
-Default model profile in this repo prioritizes quality over speed:
+Default model profile in this repo prioritizes local stability on 16 GB RAM / CPU-only machines:
 
-- planning/general: `gemma4:e4b`
-- coding: `qwen3:8b`
-- fallbacks: `gemma4:e2b`, `qwen3:4b`, `qwen3:1.7b`
+- planning/general: `qwen2.5:3b`
+- coding/codex: `qwen2.5-coder:1.5b`
+- coding fallback: `qwen2.5:3b`
+- general fallback: `qwen3:1.7b`
 
 Runtime model selection is controlled by `JARVIS_MODEL_SELECTION_STRATEGY`:
 
@@ -97,12 +98,20 @@ scripts/obsidian_sync_note.sh /path/to/note.md
 scripts/obsidian_sync_dir.sh /path/to/folder
 scripts/install_obsidian_plugin.sh /path/to/vault
 scripts/obsidian_plugin_smoke.sh
+scripts/pwa_smoke.sh
 ```
 
 To force the local environment to use the strongest default profile again:
 
 ```bash
 scripts/apply_quality_profile.sh
+```
+
+For the fastest local coding profile on this hardware:
+
+```bash
+scripts/apply_speed_profile.sh
+scripts/boot_local.sh --speed --no-seed
 ```
 
 ## Structure
@@ -139,7 +148,8 @@ Recommended manual validation:
 2. Open the workspace with `code /home/nikolasa/Downloads/Jarvis`
 3. Reload the VS Code window
 4. In Continue, use `Jarvis Programador Quality` for code tasks
-5. Try chat, edit/apply and autocomplete in a real project file
+5. Prefer `Jarvis Codex Local` for iterative code edits on CPU-only hardware
+6. Try chat, edit/apply and autocomplete in a real project file
 
 Detailed checklist:
 
@@ -150,7 +160,12 @@ Operational verification:
 ```bash
 scripts/verify_local.sh
 scripts/verify_local.sh --rag-smoke
+scripts/pwa_smoke.sh
 ```
+
+Manual runtime checklist:
+
+- [MANUAL_VALIDATION.md](/home/nikolasa/Downloads/Jarvis/MANUAL_VALIDATION.md:1)
 
 ## Local PWA Chat
 
@@ -168,9 +183,10 @@ http://127.0.0.1:8000/app/
 
 Recommended usage:
 
-1. Start with `Jarvis Programador Safe` or `Jarvis Geral Safe`.
+1. Start with `Jarvis Codex Local` or `Jarvis Programador Safe`.
 2. Use the quality profiles only for slower but stronger responses.
-3. Install the PWA from the browser if you want Jarvis as a standalone local app.
+3. Long conversations are compacted automatically before hitting Ollama, so the app stays usable even when the visible chat grows.
+4. Install the PWA from the browser if you want Jarvis as a standalone local app.
 
 The PWA supports:
 
@@ -179,6 +195,11 @@ The PWA supports:
 - workspace hint field
 - rename and delete of saved conversations
 - restore of the last selected conversation in the browser
+- quick actions for `geral`, `programador`, `pesquisador`, `professor` and `coach`
+- attachment of local files/notes directly into the prompt
+- streamed responses in the chat UI
+- filtering of saved conversations
+- Markdown export of the current conversation
 - installable app shell via manifest + service worker
 
 ## VS Code / Terminal Workflow
@@ -204,7 +225,7 @@ Inside the REPL:
 ```text
 /exit
 /clear
-/model jarvis-programador
+/model jarvis-codex
 /file apps/core/jarvis/router.py
 ```
 
@@ -294,6 +315,7 @@ What the plugin supports:
 - `Jarvis: Remember Current Note In Workspace Memory`
 - `Jarvis: Sync Current Note To Knowledge Base`
 - `Jarvis: Sync Current Folder To Knowledge Base`
+- `Jarvis: Export Current Chat Session To Note`
 
 These two commands make the Obsidian integration materially more useful:
 

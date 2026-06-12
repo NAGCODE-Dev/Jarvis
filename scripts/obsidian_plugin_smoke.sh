@@ -23,6 +23,54 @@ do
   fi
 done
 
+if ! grep -q 'text: "Pesquisa"' "$PLUGIN_DIR/main.js"; then
+  echo "[jarvis] plugin quick actions were not installed"
+  rm -rf "$TMP_DIR"
+  exit 1
+fi
+
+if ! grep -q 'text: "Salvar resposta"' "$PLUGIN_DIR/main.js"; then
+  echo "[jarvis] plugin per-message export action is missing"
+  rm -rf "$TMP_DIR"
+  exit 1
+fi
+
+if ! grep -q 'text: "Inserir na nota"' "$PLUGIN_DIR/main.js"; then
+  echo "[jarvis] plugin per-message insert action is missing"
+  rm -rf "$TMP_DIR"
+  exit 1
+fi
+
+if ! grep -q 'text: "Anexar nota"' "$PLUGIN_DIR/main.js"; then
+  echo "[jarvis] plugin attachment action for current note is missing"
+  rm -rf "$TMP_DIR"
+  exit 1
+fi
+
+if ! grep -q 'text: "Anexar seleção"' "$PLUGIN_DIR/main.js"; then
+  echo "[jarvis] plugin attachment action for selection is missing"
+  rm -rf "$TMP_DIR"
+  exit 1
+fi
+
+if ! grep -q 'jarvis-chat-quick-actions' "$PLUGIN_DIR/styles.css"; then
+  echo "[jarvis] plugin quick action styles are missing"
+  rm -rf "$TMP_DIR"
+  exit 1
+fi
+
+if ! grep -q 'jarvis-chat-message-actions' "$PLUGIN_DIR/styles.css"; then
+  echo "[jarvis] plugin message action styles are missing"
+  rm -rf "$TMP_DIR"
+  exit 1
+fi
+
+if ! grep -q 'jarvis-chat-attachment-chip' "$PLUGIN_DIR/styles.css"; then
+  echo "[jarvis] plugin attachment styles are missing"
+  rm -rf "$TMP_DIR"
+  exit 1
+fi
+
 if ! grep -q 'jarvis-local' "$COMMUNITY_PLUGINS_FILE"; then
   echo "[jarvis] plugin was not enabled in $COMMUNITY_PLUGINS_FILE"
   rm -rf "$TMP_DIR"

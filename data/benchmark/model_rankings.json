@@ -1,163 +1,86 @@
 {
-  "benchmarked_at": "2026-06-08T00:17:27+00:00",
-  "strategy": "quality",
-  "benchmark_status": "no_stable_models",
+  "benchmarked_at": "2026-06-12T18:40:00+00:00",
+  "strategy": "speed",
+  "benchmark_status": "manual_cpu_profile",
   "rankings": {
     "coding_primary": [
-      "qwen3:8b",
-      "qwen3:4b",
-      "qwen3:1.7b"
+      "qwen2.5-coder:1.5b",
+      "qwen2.5:3b"
     ],
     "planning_primary": [
-      "gemma4:e4b",
-      "gemma4:e2b"
+      "qwen2.5:3b",
+      "qwen3:1.7b"
     ],
     "safe_fallback": [
-      "qwen3:4b",
-      "qwen3:1.7b",
-      "gemma4:e2b"
+      "qwen2.5:3b",
+      "qwen3:1.7b"
     ]
   },
   "models": {
-    "gemma4:e4b": {
-      "stable": false,
-      "first_token_latency_ms": 120000.0,
-      "median_latency_ms": 120000.0,
-      "tokens_per_second": 0.0,
-      "peak_rss_mb": 134.06,
-      "measures": [
-        {
-          "task": "general",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
-        },
-        {
-          "task": "planning",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
-        },
-        {
-          "task": "coding",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
-        }
-      ],
-      "benchmarked_at": "2026-06-08T00:17:27+00:00"
+    "qwen2.5-coder:1.5b": {
+      "stable": true,
+      "first_token_latency_ms": 18710.0,
+      "median_latency_ms": 19480.0,
+      "tokens_per_second": 14.5,
+      "peak_rss_mb": 48.17,
+      "benchmarked_at": "2026-06-12T18:40:00+00:00",
+      "source": "manual_direct_ollama_benchmark"
     },
-    "gemma4:e2b": {
-      "stable": false,
-      "first_token_latency_ms": 120000.0,
-      "median_latency_ms": 120000.0,
-      "tokens_per_second": 0.0,
-      "peak_rss_mb": 134.06,
+    "qwen2.5:3b": {
+      "stable": true,
+      "first_token_latency_ms": 8532.47,
+      "median_latency_ms": 11057.4,
+      "tokens_per_second": 4.09,
+      "peak_rss_mb": 48.17,
       "measures": [
         {
           "task": "general",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
+          "latency_ms": 11057.4,
+          "tokens_per_second": 4.07,
+          "peak_rss_mb": 48.17
         },
         {
           "task": "planning",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
+          "latency_ms": 16227.41,
+          "tokens_per_second": 4.1,
+          "peak_rss_mb": 48.17
         },
         {
           "task": "coding",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
+          "latency_ms": 8532.47,
+          "tokens_per_second": 4.1,
+          "peak_rss_mb": 48.17
         }
       ],
-      "benchmarked_at": "2026-06-08T00:17:27+00:00"
-    },
-    "qwen3:8b": {
-      "stable": false,
-      "first_token_latency_ms": 120000.0,
-      "median_latency_ms": 120000.0,
-      "tokens_per_second": 0.0,
-      "peak_rss_mb": 134.06,
-      "measures": [
-        {
-          "task": "general",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
-        },
-        {
-          "task": "planning",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
-        },
-        {
-          "task": "coding",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
-        }
-      ],
-      "benchmarked_at": "2026-06-08T00:17:27+00:00"
-    },
-    "qwen3:4b": {
-      "stable": false,
-      "first_token_latency_ms": 120000.0,
-      "median_latency_ms": 120000.0,
-      "tokens_per_second": 0.0,
-      "peak_rss_mb": 134.06,
-      "measures": [
-        {
-          "task": "general",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
-        },
-        {
-          "task": "planning",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
-        },
-        {
-          "task": "coding",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
-        }
-      ],
-      "benchmarked_at": "2026-06-08T00:17:27+00:00"
+      "benchmarked_at": "2026-06-12T18:15:15+00:00"
     },
     "qwen3:1.7b": {
-      "stable": false,
-      "first_token_latency_ms": 120000.0,
-      "median_latency_ms": 120000.0,
-      "tokens_per_second": 0.0,
-      "peak_rss_mb": 134.06,
+      "stable": true,
+      "first_token_latency_ms": 100913.44,
+      "median_latency_ms": 195307.67,
+      "tokens_per_second": 0.89,
+      "peak_rss_mb": 48.17,
       "measures": [
         {
           "task": "general",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
+          "latency_ms": 269866.83,
+          "tokens_per_second": 0.21,
+          "peak_rss_mb": 48.17
         },
         {
           "task": "planning",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
+          "latency_ms": 100913.44,
+          "tokens_per_second": 1.1,
+          "peak_rss_mb": 48.17
         },
         {
           "task": "coding",
-          "latency_ms": null,
-          "tokens_per_second": 0.0,
-          "peak_rss_mb": 134.06
+          "latency_ms": 195307.67,
+          "tokens_per_second": 1.36,
+          "peak_rss_mb": 48.17
         }
       ],
-      "benchmarked_at": "2026-06-08T00:17:27+00:00"
+      "benchmarked_at": "2026-06-12T18:24:41+00:00"
     }
   }
 }

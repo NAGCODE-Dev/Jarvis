@@ -22,6 +22,9 @@ class JarvisChatView extends ItemView {
     super(leaf);
     this.plugin = plugin;
     this.messages = [];
+    this.sessions = [];
+    this.sessionSearch = "";
+    this.pendingAttachments = [];
   }
 
   getViewType() {
@@ -37,6 +40,7 @@ class JarvisChatView extends ItemView {
       model: this.plugin.settings.chatModel || this.plugin.settings.generalModel,
       workspace: this.plugin.settings.defaultWorkspace || null,
     });
+    this.sessions = await this.plugin.listChatSessions();
     this.messages = await this.plugin.getCurrentSessionMessages();
     this.render();
   }
@@ -48,12 +52,25 @@ class JarvisChatView extends ItemView {
         model,
         workspace: this.plugin.settings.defaultWorkspace || null,
       });
-      const payload = await this.plugin.sendSessionMessage({
+      const payload = await this.plugin.streamSessionMessage({
         model,
         content,
         displayContent,
         workspace: this.plugin.settings.defaultWorkspace || null,
+        onStart: () => {
+          this.messages.push({ role: "user", content, display_content: displayContent });
+          this.messages.push({ role: "assistant", content: "" });
+          this.render();
+        },
+        onChunk: (chunk) => {
+          const lastMessage = this.messages[this.messages.length - 1];
+          if (lastMessage && lastMessage.role === "assistant") {
+            lastMessage.content = `${lastMessage.content || ""}${chunk}`;
+          }
+          this.render();
+        },
       });
+      this.sessions = await this.plugin.listChatSessions();
       this.messages = payload.session.messages || [];
       this.render();
     } catch (error) {
@@ -73,6 +90,8 @@ class JarvisChatView extends ItemView {
       ["Programador Safe", this.plugin.settings.codeModel],
       ["Pesquisador Safe", this.plugin.settings.researchModel],
       ["Geral Quality", "jarvis"],
+      ["Professor Quality", "jarvis-professor"],
+      ["Coach Quality", "jarvis-coach"],
       ["Programador Quality", "jarvis-programador"],
       ["Pesquisador Quality", "jarvis-pesquisador"],
     ].forEach(([label, value]) => {
@@ -94,20 +113,157 @@ class JarvisChatView extends ItemView {
 
     const newButton = toolbar.createEl("button", { text: "Nova" });
     const clearButton = toolbar.createEl("button", { text: "Limpar" });
+    const refreshButton = toolbar.createEl("button", { text: "Atualizar" });
+    const sessionTools = contentEl.createDiv({ cls: "jarvis-chat-session-tools" });
+    const sessionSearchInput = sessionTools.createEl("input", {
+      cls: "jarvis-chat-session-search",
+      attr: { placeholder: "buscar sessão" },
+    });
+    sessionSearchInput.value = this.sessionSearch;
+    const renameButton = sessionTools.createEl("button", { text: "Renomear" });
+    const quickActions = contentEl.createDiv({ cls: "jarvis-chat-quick-actions" });
+    const currentNoteButton = quickActions.createEl("button", { text: "Nota atual" });
+    const selectionButton = quickActions.createEl("button", { text: "Seleção" });
+    const summarizeButton = quickActions.createEl("button", { text: "Resumo" });
+    const researchButton = quickActions.createEl("button", { text: "Pesquisa" });
+    const exportButton = quickActions.createEl("button", { text: "Exportar" });
+    const sessionsEl = contentEl.createDiv({ cls: "jarvis-chat-sessions" });
     const messagesEl = contentEl.createDiv({ cls: "jarvis-chat-messages" });
     const composer = contentEl.createDiv({ cls: "jarvis-chat-composer" });
+    const attachmentTools = composer.createDiv({ cls: "jarvis-chat-attachment-tools" });
+    const attachCurrentNoteButton = attachmentTools.createEl("button", { text: "Anexar nota" });
+    const attachSelectionButton = attachmentTools.createEl("button", { text: "Anexar seleção" });
+    const attachmentsEl = composer.createDiv({ cls: "jarvis-chat-attachments" });
     const textarea = composer.createEl("textarea", { attr: { placeholder: "Pergunte algo ao Jarvis..." } });
     const sendButton = composer.createEl("button", { text: "Enviar" });
 
     const renderMessages = () => {
       messagesEl.empty();
       const source = this.messages.length ? this.messages : [{ role: "assistant", content: "Jarvis pronto." }];
-      for (const message of source) {
+      for (const [index, message] of source.entries()) {
         const node = messagesEl.createDiv({
           cls: `jarvis-chat-message ${message.role === "user" ? "is-user" : "is-assistant"}`,
         });
         node.setText(message.display_content || message.content);
+        if (message.role === "assistant" && (message.content || "").trim()) {
+          const actions = node.createDiv({ cls: "jarvis-chat-message-actions" });
+          const insertButton = actions.createEl("button", { text: "Inserir na nota" });
+          insertButton.addEventListener("click", () => {
+            this.plugin.appendChatMessageToActiveNote({
+              message,
+              index,
+              sessionTitle: this.plugin.getCurrentSessionTitle(this.sessions),
+            }).catch((error) => new Notice(`Jarvis error: ${error.message}`));
+          });
+          const saveButton = actions.createEl("button", { text: "Salvar resposta" });
+          saveButton.addEventListener("click", () => {
+            this.plugin.exportChatMessageToNote({
+              message,
+              index,
+              sessionTitle: this.plugin.getCurrentSessionTitle(this.sessions),
+            }).catch((error) => new Notice(`Jarvis error: ${error.message}`));
+          });
+        }
       }
+    };
+
+    const renderAttachments = () => {
+      attachmentsEl.empty();
+      if (!this.pendingAttachments.length) return;
+      for (const attachment of this.pendingAttachments) {
+        const chip = attachmentsEl.createDiv({ cls: "jarvis-chat-attachment-chip" });
+        chip.createSpan({ text: attachment.label });
+        const removeButton = chip.createEl("button", { text: "x" });
+        removeButton.addEventListener("click", () => {
+          this.pendingAttachments = this.pendingAttachments.filter((item) => item.id !== attachment.id);
+          renderAttachments();
+        });
+      }
+    };
+
+    const renderSessions = () => {
+      sessionsEl.empty();
+      const normalizedSearch = (this.sessionSearch || "").trim().toLowerCase();
+      const filteredSessions = this.sessions.filter((session) => {
+        if (!normalizedSearch) return true;
+        const haystack = [session.title, session.workspace, session.model]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(normalizedSearch);
+      });
+      if (!filteredSessions.length) {
+        sessionsEl.setText(this.sessions.length ? "Nenhuma sessão encontrada." : "Nenhuma conversa.");
+        return;
+      }
+      for (const session of filteredSessions) {
+        const item = sessionsEl.createDiv({ cls: "jarvis-chat-session-item" });
+        if (session.id === this.plugin.settings.currentChatSessionId) {
+          item.addClass("is-active");
+        }
+        const button = item.createEl("button", {
+          text: session.title || "Nova conversa",
+          cls: "jarvis-chat-session-button",
+        });
+        const meta = item.createDiv({ cls: "jarvis-chat-session-meta" });
+        meta.setText(
+          [session.workspace || "sem workspace", session.model || "sem modelo"]
+            .filter(Boolean)
+            .join(" • "),
+        );
+        button.addEventListener("click", async () => {
+          try {
+            this.plugin.settings.currentChatSessionId = session.id;
+            await this.plugin.saveSettings();
+            this.messages = await this.plugin.getCurrentSessionMessages();
+            this.sessions = await this.plugin.listChatSessions();
+            this.render();
+          } catch (error) {
+            new Notice(`Jarvis error: ${error.message}`);
+          }
+        });
+        const removeButton = item.createEl("button", {
+          text: "x",
+          cls: "jarvis-chat-session-remove",
+        });
+        removeButton.addEventListener("click", async () => {
+          try {
+            await this.plugin.deleteSession(session.id);
+            if (session.id === this.plugin.settings.currentChatSessionId) {
+              this.plugin.settings.currentChatSessionId = "";
+              await this.plugin.saveSettings();
+              await this.plugin.ensureChatSession({
+                model: modelSelect.value,
+                workspace: workspaceInput.value.trim() || null,
+              });
+              this.messages = await this.plugin.getCurrentSessionMessages();
+            }
+            this.sessions = await this.plugin.listChatSessions();
+            this.render();
+          } catch (error) {
+            new Notice(`Jarvis error: ${error.message}`);
+          }
+        });
+      }
+    };
+
+    const refreshSessions = async () => {
+      this.sessions = await this.plugin.listChatSessions();
+      this.messages = await this.plugin.getCurrentSessionMessages();
+      renderSessions();
+      renderMessages();
+    };
+
+    const renameCurrentSession = async () => {
+      if (!this.plugin.settings.currentChatSessionId) {
+        new Notice("Nenhuma sessão ativa para renomear.");
+        return;
+      }
+      const current = this.sessions.find((session) => session.id === this.plugin.settings.currentChatSessionId);
+      const nextTitle = window.prompt("Novo título da sessão:", current?.title || "Nova conversa");
+      if (!nextTitle || !nextTitle.trim()) return;
+      await this.plugin.updateSession(this.plugin.settings.currentChatSessionId, { title: nextTitle.trim() });
+      await refreshSessions();
     };
 
     const send = async () => {
@@ -118,23 +274,42 @@ class JarvisChatView extends ItemView {
         prompt,
         workspace: workspaceInput.value.trim(),
         useCurrentNoteContext: noteToggle.checked,
+        attachments: this.pendingAttachments,
       });
       textarea.value = "";
+      this.pendingAttachments = [];
+      renderAttachments();
       sendButton.disabled = true;
       try {
         await this.plugin.ensureChatSession({
           model,
           workspace: workspaceInput.value.trim() || null,
         });
-        const payload = await this.plugin.sendSessionMessage({
+        const payload = await this.plugin.streamSessionMessage({
           model,
           content: userPrompt,
           displayContent: prompt,
           workspace: workspaceInput.value.trim() || null,
+          onStart: () => {
+            this.messages.push({ role: "user", content: userPrompt, display_content: prompt });
+            this.messages.push({ role: "assistant", content: "" });
+            renderMessages();
+          },
+          onChunk: (chunk) => {
+            const lastMessage = this.messages[this.messages.length - 1];
+            if (lastMessage && lastMessage.role === "assistant") {
+              lastMessage.content = `${lastMessage.content || ""}${chunk}`;
+            }
+            renderMessages();
+          },
         });
+        this.sessions = await this.plugin.listChatSessions();
         this.messages = payload.session.messages || [];
+        renderSessions();
         renderMessages();
       } catch (error) {
+        this.messages = this.messages.slice(0, Math.max(0, this.messages.length - 2));
+        renderMessages();
         new Notice(`Jarvis error: ${error.message}`);
       } finally {
         sendButton.disabled = false;
@@ -147,7 +322,9 @@ class JarvisChatView extends ItemView {
           model: modelSelect.value,
           workspace: workspaceInput.value.trim() || null,
         });
+        this.sessions = await this.plugin.listChatSessions();
         this.messages = [];
+        renderSessions();
         renderMessages();
       } catch (error) {
         new Notice(`Jarvis error: ${error.message}`);
@@ -155,11 +332,69 @@ class JarvisChatView extends ItemView {
     });
     clearButton.addEventListener("click", () => {
       this.plugin.clearCurrentSession(modelSelect.value, workspaceInput.value.trim() || null)
-        .then((session) => {
+        .then(async (session) => {
+          this.sessions = await this.plugin.listChatSessions();
           this.messages = session.messages || [];
+          renderSessions();
           renderMessages();
         })
         .catch((error) => new Notice(`Jarvis error: ${error.message}`));
+    });
+    refreshButton.addEventListener("click", () => {
+      refreshSessions().catch((error) => new Notice(`Jarvis error: ${error.message}`));
+    });
+    renameButton.addEventListener("click", () => {
+      renameCurrentSession().catch((error) => new Notice(`Jarvis error: ${error.message}`));
+    });
+    sessionSearchInput.addEventListener("input", () => {
+      this.sessionSearch = sessionSearchInput.value;
+      renderSessions();
+    });
+    currentNoteButton.addEventListener("click", () => {
+      this.plugin.sendCurrentNoteToChatView().catch((error) => new Notice(`Jarvis error: ${error.message}`));
+    });
+    selectionButton.addEventListener("click", () => {
+      this.plugin.sendCurrentSelectionToChatView().catch((error) => new Notice(`Jarvis error: ${error.message}`));
+    });
+    summarizeButton.addEventListener("click", () => {
+      this.plugin.sendCurrentNoteTaskToChatView({
+        model: this.plugin.settings.generalModel,
+        instruction: "Resuma esta nota em Markdown objetivo, destacando pontos-chave, lacunas e próximos passos.",
+        displayContent: "Resuma a nota atual com foco em pontos-chave e próximos passos.",
+      }).catch((error) => new Notice(`Jarvis error: ${error.message}`));
+    });
+    researchButton.addEventListener("click", () => {
+      this.plugin.sendCurrentNoteTaskToChatView({
+        model: this.plugin.settings.researchModel,
+        instruction: "Pesquise usando o contexto local do Jarvis e complemente esta nota em Markdown com referências úteis.",
+        displayContent: "Pesquise contexto local relevante para a nota atual.",
+      }).catch((error) => new Notice(`Jarvis error: ${error.message}`));
+    });
+    exportButton.addEventListener("click", () => {
+      this.plugin.exportCurrentChatSessionToNote().catch((error) => new Notice(`Jarvis error: ${error.message}`));
+    });
+    attachCurrentNoteButton.addEventListener("click", async () => {
+      try {
+        const attachment = await this.plugin.buildCurrentNoteAttachment();
+        if (!attachment) return;
+        this.pendingAttachments = [...this.pendingAttachments, attachment];
+        renderAttachments();
+      } catch (error) {
+        new Notice(`Jarvis error: ${error.message}`);
+      }
+    });
+    attachSelectionButton.addEventListener("click", () => {
+      try {
+        const attachment = this.plugin.buildCurrentSelectionAttachment();
+        if (!attachment) {
+          new Notice("Selecione algum texto primeiro.");
+          return;
+        }
+        this.pendingAttachments = [...this.pendingAttachments, attachment];
+        renderAttachments();
+      } catch (error) {
+        new Notice(`Jarvis error: ${error.message}`);
+      }
     });
     modelSelect.addEventListener("change", async () => {
       this.plugin.settings.chatModel = modelSelect.value;
@@ -181,6 +416,8 @@ class JarvisChatView extends ItemView {
       }
     });
 
+    renderSessions();
+    renderAttachments();
     renderMessages();
   }
 }
@@ -346,36 +583,15 @@ module.exports = class JarvisLocalPlugin extends Plugin {
       id: "send-current-note-to-chat",
       name: "Jarvis: Send Current Note To Chat View",
       callback: async () => {
-        const context = await this.getCurrentNoteContext();
-        if (!context) {
-          new Notice("Nenhuma nota Markdown ativa.");
-          return;
-        }
-        await this.activateView();
-        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_JARVIS_CHAT);
-        const view = leaves[0]?.view;
-        if (view && typeof view.sendExternalMessage === "function") {
-          await view.sendExternalMessage(context, "Contexto da nota atual enviado ao Jarvis.");
-        }
+        await this.sendCurrentNoteToChatView();
       },
     });
 
     this.addCommand({
       id: "send-selection-to-chat",
       name: "Jarvis: Send Selection To Chat View",
-      editorCallback: async (editor) => {
-        const selected = editor.getSelection().trim();
-        if (!selected) {
-          new Notice("Selecione algum texto primeiro.");
-          return;
-        }
-        await this.activateView();
-        const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_JARVIS_CHAT);
-        const view = leaves[0]?.view;
-        if (view && typeof view.sendExternalMessage === "function") {
-          await view.sendExternalMessage(`Selecao atual da nota:\n\n${selected}`, "Selecao atual enviada ao Jarvis.");
-          new Notice("Selecao enviada para o chat do Jarvis.");
-        }
+      editorCallback: async () => {
+        await this.sendCurrentSelectionToChatView();
       },
     });
 
@@ -400,6 +616,14 @@ module.exports = class JarvisLocalPlugin extends Plugin {
       name: "Jarvis: Sync Current Folder To Knowledge Base",
       callback: async () => {
         await this.syncCurrentFolderToKnowledgeBase();
+      },
+    });
+
+    this.addCommand({
+      id: "export-chat-session-to-note",
+      name: "Jarvis: Export Current Chat Session To Note",
+      callback: async () => {
+        await this.exportCurrentChatSessionToNote();
       },
     });
 
@@ -495,6 +719,71 @@ module.exports = class JarvisLocalPlugin extends Plugin {
     this.app.workspace.revealLeaf(leaf);
   }
 
+  async getChatView() {
+    await this.activateView();
+    const leaf = this.app.workspace.getLeavesOfType(VIEW_TYPE_JARVIS_CHAT)[0];
+    return leaf?.view || null;
+  }
+
+  async sendCurrentNoteToChatView() {
+    const context = await this.getCurrentNoteContext();
+    if (!context) {
+      new Notice("Nenhuma nota Markdown ativa.");
+      return;
+    }
+    const view = await this.getChatView();
+    if (view && typeof view.sendExternalMessage === "function") {
+      await view.sendExternalMessage(context, "Contexto da nota atual enviado ao Jarvis.");
+    }
+  }
+
+  getCurrentSelectionContext() {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const selected = view?.editor?.getSelection?.().trim();
+    if (!selected) return "";
+    return `Selecao atual da nota:\n\n${selected}`;
+  }
+
+  async sendCurrentSelectionToChatView() {
+    const selection = this.getCurrentSelectionContext();
+    if (!selection) {
+      new Notice("Selecione algum texto primeiro.");
+      return;
+    }
+    const view = await this.getChatView();
+    if (view && typeof view.sendExternalMessage === "function") {
+      await view.sendExternalMessage(selection, "Selecao atual enviada ao Jarvis.");
+      new Notice("Selecao enviada para o chat do Jarvis.");
+    }
+  }
+
+  async sendCurrentNoteTaskToChatView({ model, instruction, displayContent }) {
+    const noteContext = await this.getCurrentNoteContext();
+    if (!noteContext) {
+      new Notice("Nenhuma nota Markdown ativa.");
+      return;
+    }
+    const prompt = `${instruction}\n\n${noteContext}`;
+    const view = await this.getChatView();
+    if (!view || typeof view.sendExternalMessage !== "function") {
+      throw new Error("Jarvis Chat view indisponível.");
+    }
+    const previousModel = this.settings.chatModel;
+    this.settings.chatModel = model || previousModel || this.settings.generalModel;
+    await this.saveSettings();
+    try {
+      await view.sendExternalMessage(prompt, displayContent || instruction);
+    } finally {
+      this.settings.chatModel = previousModel;
+      await this.saveSettings();
+    }
+  }
+
+  getCurrentSessionTitle(sessions = []) {
+    const current = sessions.find((session) => session.id === this.settings.currentChatSessionId);
+    return current?.title || "Jarvis Chat";
+  }
+
   async ensureChatSession({ model, workspace }) {
     if (this.settings.currentChatSessionId) {
       try {
@@ -532,6 +821,31 @@ module.exports = class JarvisLocalPlugin extends Plugin {
     return payload.session.messages || [];
   }
 
+  async listChatSessions() {
+    const payload = await this.requestJson("/api/chat/sessions");
+    return payload.sessions || [];
+  }
+
+  async deleteSession(sessionId) {
+    return this.requestJson(`/api/chat/sessions/${sessionId}`, {
+      method: "DELETE",
+      headers: {
+        Authorization: "Bearer local",
+      },
+    });
+  }
+
+  async updateSession(sessionId, payload) {
+    return this.requestJson(`/api/chat/sessions/${sessionId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer local",
+      },
+      body: JSON.stringify(payload),
+    });
+  }
+
   async sendSessionMessage({ model, content, displayContent, workspace }) {
     await this.ensureChatSession({ model, workspace });
     return this.requestJson(`/api/chat/sessions/${this.settings.currentChatSessionId}/message`, {
@@ -547,6 +861,76 @@ module.exports = class JarvisLocalPlugin extends Plugin {
         workspace,
       }),
     });
+  }
+
+  async streamSessionMessage({ model, content, displayContent, workspace, onStart, onChunk }) {
+    await this.ensureChatSession({ model, workspace });
+    if (typeof fetch !== "function" || typeof TextDecoder !== "function") {
+      const fallback = await this.sendSessionMessage({ model, content, displayContent, workspace });
+      if (typeof onStart === "function") onStart();
+      if (typeof onChunk === "function") onChunk(fallback.message || "");
+      return fallback;
+    }
+
+    const response = await fetch(`${this.settings.apiBase}/api/chat/sessions/${this.settings.currentChatSessionId}/message/stream`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: "Bearer local",
+      },
+      body: JSON.stringify({
+        model,
+        content,
+        display_content: displayContent,
+        workspace,
+      }),
+    });
+    if (!response.ok || !response.body) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let started = false;
+    let finalPayload = null;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+      for (const event of events) {
+        const trimmed = event.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const payloadText = trimmed.slice(5).trim();
+        if (payloadText === "[DONE]") continue;
+        const payload = JSON.parse(payloadText);
+        if (payload.type === "start") {
+          if (!started) {
+            started = true;
+            if (typeof onStart === "function") onStart();
+          }
+        } else if (payload.type === "chunk") {
+          if (!started) {
+            started = true;
+            if (typeof onStart === "function") onStart();
+          }
+          if (typeof onChunk === "function") onChunk(payload.delta || "");
+        } else if (payload.type === "done") {
+          finalPayload = payload;
+        } else if (payload.type === "error") {
+          throw new Error(payload.detail || "Erro desconhecido no stream.");
+        }
+      }
+    }
+
+    if (!finalPayload) {
+      const fallback = await this.sendSessionMessage({ model, content, displayContent, workspace });
+      return fallback;
+    }
+    return finalPayload;
   }
 
   async clearCurrentSession(model, workspace) {
@@ -603,7 +987,7 @@ module.exports = class JarvisLocalPlugin extends Plugin {
     });
   }
 
-  async buildChatPrompt({ prompt, workspace, useCurrentNoteContext }) {
+  async buildChatPrompt({ prompt, workspace, useCurrentNoteContext, attachments = [] }) {
     const pieces = [];
     const effectiveWorkspace = workspace || this.settings.defaultWorkspace || "";
     if (effectiveWorkspace) {
@@ -614,6 +998,9 @@ module.exports = class JarvisLocalPlugin extends Plugin {
       if (context) {
         pieces.push(context);
       }
+    }
+    if (attachments.length) {
+      pieces.push(attachments.map((attachment) => attachment.content).join("\n\n"));
     }
     pieces.push(prompt);
     return pieces.join("\n\n");
@@ -631,6 +1018,31 @@ module.exports = class JarvisLocalPlugin extends Plugin {
       `workspace: ${workspace || "none"}\n\n` +
       `${content}`
     );
+  }
+
+  async buildCurrentNoteAttachment() {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view || !view.file) {
+      new Notice("Nenhuma nota Markdown ativa.");
+      return null;
+    }
+    const content = await this.readMarkdownViewContent(view);
+    return {
+      id: `note-${Date.now()}`,
+      label: `nota: ${view.file.basename}`,
+      content: `[ATTACHMENT: NOTE]\npath: ${view.file.path}\n\n${content}`,
+    };
+  }
+
+  buildCurrentSelectionAttachment() {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const selected = view?.editor?.getSelection?.().trim();
+    if (!selected) return null;
+    return {
+      id: `selection-${Date.now()}`,
+      label: "seleção atual",
+      content: `[ATTACHMENT: SELECTION]\n\n${selected}`,
+    };
   }
 
   sanitizeFileName(value) {
@@ -658,6 +1070,20 @@ module.exports = class JarvisLocalPlugin extends Plugin {
       return existing;
     }
     return this.app.vault.create(fullPath, body);
+  }
+
+  async appendMarkdownToActiveNote(heading, content) {
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    if (!view || !view.file) {
+      new Notice("Nenhuma nota Markdown ativa.");
+      return null;
+    }
+    const file = view.file;
+    const latest = await this.app.vault.cachedRead(file);
+    const stamp = new Date().toISOString().slice(0, 16).replace("T", " ");
+    const block = `\n\n## ${heading} (${stamp})\n\n${content.trim()}\n`;
+    await this.app.vault.modify(file, `${latest}${block}`);
+    return file;
   }
 
   async rememberCurrentNote() {
@@ -722,6 +1148,76 @@ module.exports = class JarvisLocalPlugin extends Plugin {
       synced += 1;
     }
     new Notice(`Jarvis sincronizou ${synced} nota(s) da pasta atual.`);
+  }
+
+  async exportCurrentChatSessionToNote() {
+    const sessionPayload = await this.ensureChatSession({
+      model: this.settings.chatModel || this.settings.generalModel,
+      workspace: this.settings.defaultWorkspace || null,
+    });
+    const session = sessionPayload.session || sessionPayload;
+    const messages = session.messages || [];
+    if (!messages.length) {
+      new Notice("A sessão atual do Jarvis está vazia.");
+      return;
+    }
+    const sourceFile = this.app.workspace.getActiveViewOfType(MarkdownView)?.file || null;
+    const title = session.title || "Jarvis Chat Export";
+    const content = [
+      `- model: ${session.model || this.settings.chatModel || this.settings.generalModel}`,
+      `- workspace: ${session.workspace || this.settings.defaultWorkspace || "none"}`,
+      "",
+      ...messages.flatMap((message) => [
+        `## ${message.role === "user" ? "Voce" : "Jarvis"}`,
+        "",
+        `${message.display_content || message.content}`,
+        "",
+      ]),
+    ].join("\n");
+    const exported = await this.createDerivedNote(sourceFile, `${this.settings.responseHeadingPrefix} Chat Export`, content);
+    await this.app.workspace.getLeaf(true).openFile(exported);
+    new Notice(`Sessão exportada para ${exported.path}`);
+  }
+
+  async exportChatMessageToNote({ message, index, sessionTitle }) {
+    const content = (message?.content || "").trim();
+    if (!content) {
+      new Notice("Essa resposta está vazia.");
+      return;
+    }
+    const sourceFile = this.app.workspace.getActiveViewOfType(MarkdownView)?.file || null;
+    const headingBase = this.settings.responseHeadingPrefix || "Jarvis";
+    const title = `${headingBase} Reply`;
+    const body = [
+      `- source_session: ${sessionTitle || "Jarvis Chat"}`,
+      `- message_index: ${index}`,
+      `- exported_at: ${new Date().toISOString()}`,
+      "",
+      content,
+    ].join("\n");
+    const exported = await this.createDerivedNote(sourceFile, title, body);
+    await this.app.workspace.getLeaf(true).openFile(exported);
+    new Notice(`Resposta exportada para ${exported.path}`);
+  }
+
+  async appendChatMessageToActiveNote({ message, index, sessionTitle }) {
+    const content = (message?.content || "").trim();
+    if (!content) {
+      new Notice("Essa resposta está vazia.");
+      return;
+    }
+    const headingBase = this.settings.responseHeadingPrefix || "Jarvis";
+    const heading = `${headingBase} Reply`;
+    const rendered = [
+      `> source_session: ${sessionTitle || "Jarvis Chat"}`,
+      `> message_index: ${index}`,
+      "",
+      content,
+    ].join("\n");
+    const file = await this.appendMarkdownToActiveNote(heading, rendered);
+    if (file) {
+      new Notice(`Resposta inserida em ${file.path}`);
+    }
   }
 
   async runOnActiveNote({ model, instruction, heading, createNewNote = false }) {

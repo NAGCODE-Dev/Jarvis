@@ -20,7 +20,10 @@ class SessionStore:
     def list_sessions(self) -> list[dict[str, str]]:
         sessions: list[dict[str, str]] = []
         for path in sorted(self.root.glob("*.json")):
-            payload = self._read(path)
+            try:
+                payload = self._read(path)
+            except (OSError, json.JSONDecodeError, KeyError):
+                continue
             sessions.append(
                 {
                     "id": payload["id"],
@@ -75,7 +78,7 @@ class SessionStore:
             session["workspace"] = workspace
         session["model"] = model
         if not session.get("title") or session["title"] == "Nova conversa":
-            session["title"] = user_content.strip().splitlines()[0][:80] or "Nova conversa"
+            session["title"] = self._derive_title(user_content=user_content, user_display_content=user_display_content)
         session.setdefault("messages", []).extend(
             [
                 {
@@ -90,6 +93,19 @@ class SessionStore:
 
     def _path(self, session_id: str) -> Path:
         return self.root / f"{session_id}.json"
+
+    def _derive_title(self, *, user_content: str, user_display_content: str | None) -> str:
+        raw_title = (user_display_content or user_content).strip()
+        if not raw_title:
+            return "Nova conversa"
+        lines = [line.strip() for line in raw_title.splitlines() if line.strip()]
+        if not lines:
+            return "Nova conversa"
+        first_line = lines[0]
+        if first_line.startswith("[WORKSPACE:") and "]" in first_line:
+            _, _, remainder = first_line.partition("]")
+            first_line = remainder.strip() or (lines[1] if len(lines) > 1 else "")
+        return first_line[:80] or "Nova conversa"
 
     def _read(self, path: Path) -> dict:
         return json.loads(path.read_text(encoding="utf-8"))

@@ -1,0 +1,19 @@
+{
+  "id": "3f157e7ab1d74ef0a9a7e9e0b422ed40",
+  "title": "[WORKSPACE: jarvis]",
+  "model": "jarvis-safe",
+  "workspace": "jarvis",
+  "created_at": "2026-06-12T17:46:10+00:00",
+  "updated_at": "2026-06-12T17:48:56+00:00",
+  "messages": [
+    {
+      "role": "user",
+      "content": "[WORKSPACE: jarvis]\nResponda apenas: ok",
+      "display_content": "Responda apenas: ok"
+    },
+    {
+      "role": "assistant",
+      "content": "ok"
+    }
+  ]
+}

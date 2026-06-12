@@ -3,6 +3,16 @@ version: 0.1.0
 schema: v1
 
 models:
+  - name: Jarvis Codex Local
+    provider: openai
+    model: jarvis-codex
+    apiBase: http://127.0.0.1:8000/v1
+    apiKey: local
+    roles:
+      - chat
+      - edit
+      - apply
+
   - name: Jarvis Programador Safe
     provider: openai
     model: jarvis-programador-safe
@@ -57,7 +67,7 @@ models:
 
   - name: Qwen Autocomplete Local
     provider: ollama
-    model: qwen3:1.7b
+    model: qwen2.5-coder:1.5b
     apiBase: http://127.0.0.1:11434
     roles:
       - autocomplete

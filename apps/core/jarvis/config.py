@@ -24,6 +24,8 @@ class Settings(BaseSettings):
 
     ollama_base_url: str = "http://127.0.0.1:11434"
     ollama_timeout_seconds: float = 300.0
+    ollama_num_ctx: int = 1024
+    ollama_keep_alive: str = "10m"
     qdrant_url: str = "http://127.0.0.1:6333"
     qdrant_collection: str = "jarvis-knowledge"
     qdrant_local_pathname: str = "qdrant-local"
@@ -31,10 +33,14 @@ class Settings(BaseSettings):
     data_dir: Path = ROOT_DIR / "data"
     config_dir: Path = ROOT_DIR / "config"
 
-    planner_model: str = "gemma4:e4b"
-    planner_fallback_model: str = "gemma4:e2b"
-    coder_model: str = "qwen3:8b"
-    coder_fallback_model: str = "qwen3:1.7b"
+    planner_model: str = "qwen2.5:3b"
+    planner_fallback_model: str = "qwen3:1.7b"
+    coder_model: str = "qwen2.5-coder:1.5b"
+    coder_fallback_model: str = "qwen2.5:3b"
+    safe_model: str = "qwen2.5:3b"
+    safe_fallback_model: str = "qwen3:1.7b"
+    safe_coder_model: str = "qwen2.5-coder:1.5b"
+    safe_coder_fallback_model: str = "qwen2.5:3b"
     embedding_model: str = "nomic-embed-text"
 
     default_response_language: Literal["auto", "pt-BR", "en"] = "auto"
@@ -48,6 +54,21 @@ class Settings(BaseSettings):
     model_quality_latency_soft_cap_ms: float = 45000.0
     model_balanced_latency_soft_cap_ms: float = 25000.0
     model_speed_latency_soft_cap_ms: float = 12000.0
+    history_compaction_enabled: bool = True
+    history_char_budget: int = 9000
+    history_preserve_messages: int = 6
+    working_memory_limit: int = 40
+    working_memory_preserve_recent: int = 12
+    summary_item_limit: int = 200
+    topic_memory_entry_limit: int = 200
+    active_memory_days: int = 21
+    semantic_memory_enabled: bool = True
+    semantic_memory_top_k: int = 3
+    workspace_root: Path = ROOT_DIR
+    workspace_tree_max_depth: int = 4
+    workspace_max_file_bytes: int = 200_000
+    terminal_shell: str = "/bin/bash"
+    terminal_read_chunk_bytes: int = 65_536
 
     @property
     def identity_dir(self) -> Path:
@@ -112,6 +133,30 @@ class Settings(BaseSettings):
     @property
     def workspace_memory_dir(self) -> Path:
         return self.memory_dir / "workspaces"
+
+    @property
+    def current_context_path(self) -> Path:
+        return self.memory_dir / "current_context.json"
+
+    @property
+    def active_memory_dir(self) -> Path:
+        return self.memory_dir / "active"
+
+    @property
+    def topic_memory_dir(self) -> Path:
+        return self.memory_dir / "topics"
+
+    @property
+    def vector_memory_dir(self) -> Path:
+        return self.memory_dir / "vectors"
+
+    @property
+    def topic_index_path(self) -> Path:
+        return self.memory_dir / "topic_index.json"
+
+    @property
+    def memory_vectors_path(self) -> Path:
+        return self.vector_memory_dir / "memory_vectors.json"
 
     @property
     def knowledge_dir(self) -> Path:

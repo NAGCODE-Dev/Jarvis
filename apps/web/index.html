@@ -27,6 +27,8 @@
             <option value="jarvis-programador-safe">Jarvis Programador Safe</option>
             <option value="jarvis-pesquisador-safe">Jarvis Pesquisador Safe</option>
             <option value="jarvis">Jarvis Geral Quality</option>
+            <option value="jarvis-professor">Jarvis Professor Quality</option>
+            <option value="jarvis-coach">Jarvis Coach Quality</option>
             <option value="jarvis-programador">Jarvis Programador Quality</option>
             <option value="jarvis-pesquisador">Jarvis Pesquisador Quality</option>
           </select>
@@ -36,6 +38,17 @@
           <label for="workspace">Workspace</label>
           <input id="workspace" placeholder="jarvis, faculdade, crossfit..." />
           <small>Opcional. Adicionado ao prompt como contexto explícito.</small>
+        </section>
+
+        <section class="panel">
+          <label>Atalhos por agente</label>
+          <div class="quick-actions">
+            <button type="button" class="secondary quick-action" data-model="jarvis-safe" data-prompt="Resuma o contexto atual e sugira próximos passos.">Geral</button>
+            <button type="button" class="secondary quick-action" data-model="jarvis-programador-safe" data-prompt="Analise este código e proponha melhorias objetivas.">Programador</button>
+            <button type="button" class="secondary quick-action" data-model="jarvis-pesquisador-safe" data-prompt="Pesquise no contexto local e responda com referências úteis.">Pesquisador</button>
+            <button type="button" class="secondary quick-action" data-model="jarvis-professor" data-prompt="Explique o tema de forma didática e organize um plano de estudos.">Professor</button>
+            <button type="button" class="secondary quick-action" data-model="jarvis-coach" data-prompt="Monte ou ajuste um treino com base no meu contexto atual.">Coach</button>
+          </div>
         </section>
 
         <section class="panel">
@@ -49,6 +62,11 @@
           <label for="session-title">Título da conversa</label>
           <input id="session-title" placeholder="Nova conversa" />
           <small>Você pode renomear a conversa atual.</small>
+        </section>
+
+        <section class="panel">
+          <label for="session-search">Buscar conversas</label>
+          <input id="session-search" placeholder="filtrar por título ou modelo" />
         </section>
 
         <section class="panel">
@@ -72,7 +90,12 @@
 
         <section id="messages" class="messages" aria-live="polite"></section>
 
-        <form id="chat-form" class="composer">
+        <form id="chat-form" class="composer" data-dropzone="idle">
+          <div class="attachment-toolbar">
+            <button id="attach-file" type="button" class="secondary">Anexar arquivo/nota</button>
+            <input id="file-input" type="file" multiple class="hidden-file-input" />
+          </div>
+          <div id="attachments" class="attachments-list"></div>
           <textarea
             id="prompt"
             rows="3"
@@ -81,7 +104,10 @@
           ></textarea>
           <div class="composer-actions">
             <span id="hint">Shift+Enter cria nova linha</span>
-            <button id="send" type="submit">Enviar</button>
+            <div class="composer-buttons">
+              <button id="export-chat" type="button" class="secondary">Exportar MD</button>
+              <button id="send" type="submit">Enviar</button>
+            </div>
           </div>
         </form>
       </main>

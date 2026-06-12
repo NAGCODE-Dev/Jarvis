@@ -9,6 +9,9 @@ from jarvis.config import settings
 
 
 DEFAULT_CAPABILITIES = {
+    "qwen2.5-coder:1.5b": {"coding": 9, "planning": 4, "reasoning": 4, "general": 4},
+    "qwen2.5-coder:3b": {"coding": 10, "planning": 5, "reasoning": 5, "general": 5},
+    "qwen2.5:3b": {"coding": 8, "planning": 7, "reasoning": 7, "general": 7},
     "qwen3:8b": {"coding": 11, "planning": 8, "reasoning": 9, "general": 8},
     "qwen3:4b": {"coding": 10, "planning": 7, "reasoning": 8, "general": 7},
     "qwen3:1.7b": {"coding": 7, "planning": 5, "reasoning": 5, "general": 5},
@@ -23,18 +26,18 @@ class ModelRegistry:
         self._ensure_layout()
 
     def _ensure_layout(self) -> None:
+        configured_models = self._configured_models()
         settings.models_dir.mkdir(parents=True, exist_ok=True)
         settings.model_rankings_path.parent.mkdir(parents=True, exist_ok=True)
         if not settings.model_registry_path.exists():
-            self._write(settings.model_registry_path, {
-                "installed": [
-                    settings.planner_model,
-                    settings.planner_fallback_model,
-                    settings.coder_model,
-                    settings.coder_fallback_model,
-                    settings.embedding_model,
-                ]
-            })
+            self._write(settings.model_registry_path, {"installed": configured_models})
+        else:
+            registry = self._read(settings.model_registry_path)
+            installed = registry.get("installed", [])
+            merged = list(dict.fromkeys([*configured_models, *installed]))
+            if merged != installed:
+                registry["installed"] = merged
+                self._write(settings.model_registry_path, registry)
         if not settings.model_capabilities_path.exists():
             self._write(settings.model_capabilities_path, DEFAULT_CAPABILITIES)
         if not settings.model_benchmarks_path.exists():
@@ -49,7 +52,14 @@ class ModelRegistry:
             })
 
     def resolve_primary(self, task: str) -> tuple[str, str]:
-        rankings = self._read(settings.model_rankings_path).get("rankings", {})
+        payload = self._read(settings.model_rankings_path)
+        if (
+            payload.get("benchmark_status") != "ok"
+            or payload.get("strategy") != settings.model_selection_strategy
+        ):
+            rankings = self._default_rankings()
+        else:
+            rankings = payload.get("rankings", self._default_rankings())
         if task == "coding":
             options = rankings.get("coding_primary", [settings.coder_model, settings.coder_fallback_model])
         else:
@@ -210,3 +220,27 @@ class ModelRegistry:
 
     def _write(self, path: Path, payload: Any) -> None:
         path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    def _default_rankings(self) -> dict[str, list[str]]:
+        return {
+            "coding_primary": [settings.coder_model, settings.coder_fallback_model],
+            "planning_primary": [settings.planner_model, settings.planner_fallback_model],
+            "safe_fallback": [settings.safe_model, settings.safe_fallback_model],
+        }
+
+    def _configured_models(self) -> list[str]:
+        return list(
+            dict.fromkeys(
+                [
+                    settings.planner_model,
+                    settings.planner_fallback_model,
+                    settings.coder_model,
+                    settings.coder_fallback_model,
+                    settings.safe_model,
+                    settings.safe_fallback_model,
+                    settings.safe_coder_model,
+                    settings.safe_coder_fallback_model,
+                    settings.embedding_model,
+                ]
+            )
+        )

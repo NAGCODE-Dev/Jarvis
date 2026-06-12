@@ -10,6 +10,8 @@ HOST="${JARVIS_HOST:-127.0.0.1}"
 PORT="${JARVIS_PORT:-8000}"
 SEED_DEMO=1
 RUN_BENCHMARK=0
+PROFILE_MODE="${JARVIS_PROFILE_MODE:-auto}"
+LOW_MEMORY_THRESHOLD_MB="${JARVIS_LOW_MEMORY_THRESHOLD_MB:-6000}"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -19,9 +21,15 @@ while [ "$#" -gt 0 ]; do
     --benchmark)
       RUN_BENCHMARK=1
       ;;
+    --speed)
+      PROFILE_MODE="speed"
+      ;;
+    --quality)
+      PROFILE_MODE="quality"
+      ;;
     *)
       echo "[jarvis] Unknown option: $1"
-      echo "Usage: scripts/boot_local.sh [--no-seed] [--benchmark]"
+      echo "Usage: scripts/boot_local.sh [--no-seed] [--benchmark] [--speed] [--quality]"
       exit 1
       ;;
   esac
@@ -35,8 +43,38 @@ if [ ! -x "$VENV_PYTHON" ]; then
   exit 1
 fi
 
-echo "[jarvis] Applying quality profile"
-"$ROOT_DIR/scripts/apply_quality_profile.sh"
+detect_available_memory_mb() {
+  awk '/MemAvailable:/ { printf "%d\n", $2 / 1024 }' /proc/meminfo 2>/dev/null || echo 0
+}
+
+apply_profile() {
+  case "$PROFILE_MODE" in
+    quality)
+      echo "[jarvis] Applying quality profile"
+      sh "$ROOT_DIR/scripts/apply_quality_profile.sh"
+      ;;
+    speed)
+      echo "[jarvis] Applying speed profile"
+      sh "$ROOT_DIR/scripts/apply_speed_profile.sh"
+      ;;
+    auto)
+      available_mb=$(detect_available_memory_mb)
+      if [ "${available_mb:-0}" -lt "$LOW_MEMORY_THRESHOLD_MB" ]; then
+        echo "[jarvis] Low memory detected (${available_mb} MB available); applying speed profile"
+        sh "$ROOT_DIR/scripts/apply_speed_profile.sh"
+      else
+        echo "[jarvis] Sufficient memory detected (${available_mb} MB available); applying quality profile"
+        sh "$ROOT_DIR/scripts/apply_quality_profile.sh"
+      fi
+      ;;
+    *)
+      echo "[jarvis] Invalid profile mode: $PROFILE_MODE"
+      exit 1
+      ;;
+  esac
+}
+
+apply_profile
 
 echo "[jarvis] Starting infra when available"
 if ! "$ROOT_DIR/scripts/start_infra.sh"; then
@@ -59,7 +97,9 @@ fi
 
 if [ ! -f "$PID_FILE" ]; then
   echo "[jarvis] Starting Jarvis core on ${HOST}:${PORT}"
-  nohup "$ROOT_DIR/scripts/run_core.sh" >"$LOG_FILE" 2>&1 &
+  setsid env PYTHONPATH="$ROOT_DIR/apps/core" \
+    "$VENV_PYTHON" -m uvicorn jarvis.main:app --host "$HOST" --port "$PORT" \
+    </dev/null >"$LOG_FILE" 2>&1 &
   new_pid=$!
   echo "$new_pid" > "$PID_FILE"
 fi
