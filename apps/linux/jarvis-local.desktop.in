@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Jarvis Local
+Comment=Assistente local Jarvis em modo aplicativo Linux
+Exec=__ROOT_DIR__/scripts/run_linux_app.sh
+Icon=__ROOT_DIR__/apps/web/icon.svg
+Terminal=false
+Categories=Development;Utility;
+StartupNotify=true
+StartupWMClass=Jarvis Local

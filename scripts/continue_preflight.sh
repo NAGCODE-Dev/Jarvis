@@ -4,7 +4,9 @@ set -eu
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 GLOBAL_CONTINUE_CONFIG="${HOME}/.continue/config.yaml"
 PROJECT_CONTINUE_CONFIG="$ROOT_DIR/config/continue/config.yaml"
-STATUS_URL="http://127.0.0.1:8000/api/status"
+HOST="${JARVIS_HOST:-127.0.0.1}"
+PORT="${JARVIS_PORT:-8000}"
+STATUS_URL="http://${HOST}:${PORT}/api/status"
 
 echo "[jarvis] Continue preflight"
 echo

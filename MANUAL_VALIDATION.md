@@ -26,13 +26,40 @@ Verificações:
 5. Anexar um arquivo `.md` ou `.txt`.
 6. Enviar uma pergunta e confirmar streaming visual da resposta.
 7. Exportar a conversa atual para Markdown.
-8. Recarregar a página e confirmar que a conversa anterior foi restaurada.
-9. Excluir a conversa atual.
+8. Abrir um arquivo no painel `Workspace`, editar e salvar.
+9. Criar um novo arquivo pelo botão `Novo arquivo`.
+10. Abrir mais de um arquivo e trocar entre abas no editor.
+11. Renomear e excluir um arquivo pelo editor integrado.
+12. Pedir ao Jarvis uma edição no arquivo ativo e revisar o diff antes de aplicar.
+13. Aplicar apenas um hunk específico da proposta e verificar o efeito no buffer.
+14. Rodar `Jarvis tarefa` com o arquivo ativo e confirmar resumo, comando sugerido e proposta de edição.
+15. Executar o comando sugerido no terminal pelo botão dedicado.
+16. Usar `Anexar no chat` para mandar o conteúdo do arquivo aberto como contexto.
+17. Clicar no terminal, digitar comandos reais em bash, usar `Enter`, `Tab`, setas e `Ctrl+C`.
+18. Confirmar que `cd` persiste entre comandos no mesmo terminal.
+19. Recarregar a página e confirmar que a conversa anterior foi restaurada.
+20. Excluir a conversa atual.
 
 Smoke rápido:
 
 ```bash
 scripts/pwa_smoke.sh
+```
+
+## Aplicação Linux
+
+Para validar o Jarvis como aplicação Linux local:
+
+1. Rode `scripts/install_linux_app.sh`
+2. Confirme que o launcher `jarvis-local` foi criado em `~/.local/bin`
+3. Confirme que a entrada `.desktop` foi criada em `~/.local/share/applications/jarvis-local.desktop`
+4. Abra pelo menu do sistema procurando `Jarvis Local` ou rode `jarvis-local`
+5. Confirme que a interface abre em modo app apontando para `http://127.0.0.1:8000/app/`
+
+Smoke rápido:
+
+```bash
+JARVIS_HOST=127.0.0.1 JARVIS_PORT=8000 scripts/linux_app_smoke.sh
 ```
 
 ## Obsidian Plugin
@@ -83,6 +110,7 @@ scripts/obsidian_sync_dir.sh /path/to/folder
 Considere o Jarvis v1 validado quando:
 
 - PWA funcionar com sessões, anexos, streaming e exportação
+- PWA permitir abrir/salvar arquivos do workspace e usar um terminal bash persistente dentro do app
 - plugin do Obsidian funcionar com chat, memória, sync e export
 - RAG responder com documento indexado local
 - Continue conseguir conversar com o router local

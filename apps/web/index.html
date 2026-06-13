@@ -78,6 +78,67 @@
           <h2>Status</h2>
           <pre id="status">Carregando...</pre>
         </section>
+
+        <section class="panel">
+          <label for="workspace-files">Workspace</label>
+          <div class="workspace-actions">
+            <button id="refresh-files" type="button" class="secondary">Atualizar</button>
+            <button id="new-file" type="button" class="secondary">Novo arquivo</button>
+            <button id="new-folder" type="button" class="secondary">Nova pasta</button>
+            <button id="open-path" type="button" class="secondary">Abrir caminho</button>
+            <button id="attach-open-file" type="button" class="secondary">Anexar no chat</button>
+          </div>
+          <div class="workspace-search-row">
+            <input id="workspace-search" placeholder="Buscar arquivo ou conteúdo no workspace..." />
+            <button id="run-workspace-search" type="button" class="secondary">Buscar</button>
+            <button id="clear-workspace-search" type="button" class="secondary">Limpar</button>
+          </div>
+          <div id="workspace-search-results" class="workspace-search-results"></div>
+          <div id="workspace-files" class="workspace-tree"></div>
+        </section>
+
+        <section class="panel">
+          <label for="terminal-cwd">Terminal Bash</label>
+          <input id="terminal-cwd" placeholder="cwd inicial relativo, ex: apps/core" />
+          <div id="terminal-sessions" class="terminal-sessions"></div>
+          <div class="terminal-command-row">
+            <input id="terminal-command" placeholder="Comando bash rápido, ex: pytest -q" />
+            <button id="run-terminal-command" type="button" class="secondary">Executar</button>
+            <button id="send-terminal-command" type="button" class="secondary">Enviar</button>
+            <button id="cd-file-dir" type="button" class="secondary">Ir p/ arquivo</button>
+          </div>
+          <div class="terminal-help-shell">
+            <div class="terminal-help-header">
+              <strong>Guia do Terminal</strong>
+              <span>Use <code>/help</code> no chat para abrir o guia completo.</span>
+            </div>
+            <div id="command-history" class="command-history"></div>
+            <button id="clear-command-history" type="button" class="secondary">Limpar histórico</button>
+          </div>
+          <div class="git-shell">
+            <div class="git-header">
+              <strong>Painel Git</strong>
+              <span>Status, diff, log e suporte opcional a GitHub CLI.</span>
+            </div>
+            <div class="git-actions">
+              <button id="git-status" type="button" class="secondary">Status</button>
+              <button id="git-diff" type="button" class="secondary">Diff</button>
+              <button id="git-log" type="button" class="secondary">Log</button>
+              <button id="git-github" type="button" class="secondary">GitHub</button>
+              <button id="git-attach" type="button" class="secondary">Anexar Git</button>
+            </div>
+            <pre id="git-output" class="git-output">Nenhum contexto Git carregado ainda.</pre>
+          </div>
+          <div class="terminal-row">
+            <button id="new-terminal" type="button" class="secondary">Novo terminal</button>
+            <button id="close-terminal" type="button" class="secondary danger">Fechar atual</button>
+            <button id="restart-terminal" type="button" class="secondary">Reiniciar</button>
+            <button id="interrupt-terminal" type="button" class="secondary">Ctrl+C</button>
+            <button id="clear-terminal-view" type="button" class="secondary">Limpar tela</button>
+          </div>
+          <pre id="terminal-output" class="terminal-output" tabindex="0">Iniciando terminal...</pre>
+          <small>Clique no terminal e digite. Enter, Tab, setas e Ctrl+C são encaminhados para o bash.</small>
+        </section>
       </aside>
 
       <main class="chat-layout">
@@ -90,12 +151,111 @@
 
         <section id="messages" class="messages" aria-live="polite"></section>
 
+        <section class="approval-shell">
+          <div class="approval-header">
+            <div>
+              <strong>Fila de Ações do Jarvis</strong>
+              <p>Comandos, diffs e melhorias propostas para aplicar no projeto.</p>
+            </div>
+            <div class="approval-toolbar">
+              <button id="refresh-approvals" type="button" class="secondary">Atualizar</button>
+              <button id="self-improve-active" type="button" class="secondary">Autoaprimorar arquivo</button>
+            </div>
+          </div>
+          <div class="approval-quick-actions">
+            <button id="queue-suggested-command" type="button" class="secondary">Fila: comando sugerido</button>
+            <button id="queue-edit-proposal" type="button" class="secondary">Fila: diff atual</button>
+          </div>
+          <div id="approvals" class="approvals-list">Nenhuma ação pendente.</div>
+        </section>
+
+        <section class="workspace-editor-shell">
+          <div class="workspace-codex-grid">
+            <div class="workspace-obsidian-shell">
+              <div class="workspace-obsidian-header">
+                <strong>Obsidian Flow</strong>
+                <div class="workspace-obsidian-actions">
+                  <button id="remember-note" type="button" class="secondary">Lembrar nota</button>
+                  <button id="index-note" type="button" class="secondary">Indexar nota</button>
+                  <button id="chat-about-note" type="button" class="secondary">Usar no chat</button>
+                </div>
+              </div>
+              <pre id="obsidian-status" class="obsidian-status">Abra uma nota Markdown para usar memória e conhecimento do Obsidian no Jarvis.</pre>
+              <div class="obsidian-automation-row">
+                <label class="context-toggle"><input id="obsidian-auto-remember" type="checkbox" checked /> lembrar ao salvar</label>
+                <label class="context-toggle"><input id="obsidian-auto-index" type="checkbox" /> indexar ao salvar</label>
+              </div>
+            </div>
+            <div class="workspace-recent-shell">
+              <div class="workspace-recent-header">
+                <strong>Arquivos Recentes</strong>
+                <button id="clear-recent-files" type="button" class="secondary">Limpar</button>
+              </div>
+              <div id="recent-files" class="recent-files"></div>
+            </div>
+          </div>
+          <div class="workspace-history-shell">
+            <div class="workspace-history-header">
+              <strong>Histórico Operacional</strong>
+              <button id="refresh-operations" type="button" class="secondary">Atualizar histórico</button>
+            </div>
+            <div id="session-operations" class="session-operations">Nenhum evento operacional ainda.</div>
+          </div>
+          <div class="workspace-editor-header">
+            <strong id="editor-path">Nenhum arquivo aberto</strong>
+            <div class="workspace-editor-actions">
+              <button id="ask-jarvis-edit" type="button" class="secondary">Jarvis editar</button>
+              <button id="ask-jarvis-batch-edit" type="button" class="secondary">Editar abas</button>
+              <button id="apply-proposal" type="button" class="secondary">Aplicar proposta</button>
+              <button id="apply-batch-proposal" type="button" class="secondary">Aplicar lote</button>
+              <button id="save-all-files" type="button" class="secondary">Salvar abas</button>
+              <button id="attach-open-tabs" type="button" class="secondary">Anexar abas</button>
+              <button id="run-selection" type="button" class="secondary">Executar seleção</button>
+              <button id="rename-file" type="button" class="secondary">Renomear</button>
+              <button id="delete-file" type="button" class="secondary danger">Excluir</button>
+              <button id="save-file" type="button" class="secondary">Salvar</button>
+            </div>
+          </div>
+          <div id="editor-tabs" class="editor-tabs"></div>
+          <div class="editor-assist-row">
+            <input id="editor-instruction" placeholder="Descreva a edição desejada no arquivo ativo..." />
+          </div>
+          <pre id="editor-selection" class="editor-selection">Nenhuma seleção ativa.</pre>
+          <div class="editor-assist-actions">
+            <button id="run-task-assist" type="button" class="secondary">Jarvis tarefa</button>
+            <button id="run-task-cycle" type="button" class="secondary">Jarvis executar</button>
+            <button id="run-suggested-command" type="button" class="secondary">Executar comando sugerido</button>
+          </div>
+          <pre id="editor-task-output" class="editor-task-output">Nenhuma tarefa operacional ainda.</pre>
+          <pre id="editor-batch-output" class="editor-task-output">Nenhuma proposta em lote ainda.</pre>
+          <div id="editor-batch-proposals" class="editor-batch-proposals"></div>
+          <pre id="editor-diff" class="editor-diff">Nenhuma proposta de edição ainda.</pre>
+          <div id="editor-hunks" class="editor-hunks"></div>
+          <textarea id="file-editor" rows="12" placeholder="Abra um arquivo do workspace para editar aqui..."></textarea>
+        </section>
+
         <form id="chat-form" class="composer" data-dropzone="idle">
+          <div class="composer-context">
+            <div class="composer-context-row">
+              <label class="context-toggle"><input id="ctx-active-file" type="checkbox" checked /> Arquivo ativo</label>
+              <label class="context-toggle"><input id="ctx-open-tabs" type="checkbox" /> Abas abertas</label>
+              <label class="context-toggle"><input id="ctx-terminal" type="checkbox" checked /> Terminal</label>
+              <label class="context-toggle"><input id="ctx-search" type="checkbox" /> Busca do workspace</label>
+            </div>
+            <pre id="composer-context-preview" class="composer-context-preview">Contexto automático desativado.</pre>
+          </div>
           <div class="attachment-toolbar">
             <button id="attach-file" type="button" class="secondary">Anexar arquivo/nota</button>
             <input id="file-input" type="file" multiple class="hidden-file-input" />
           </div>
           <div id="attachments" class="attachments-list"></div>
+          <div class="slash-command-shell">
+            <div class="slash-command-header">
+              <strong>Paleta de Comandos</strong>
+              <span>/help /open /search /run /new /remember-note /index-note /chat-note</span>
+            </div>
+            <div id="slash-commands" class="slash-commands"></div>
+          </div>
           <textarea
             id="prompt"
             rows="3"

@@ -200,6 +200,15 @@ The PWA supports:
 - streamed responses in the chat UI
 - filtering of saved conversations
 - Markdown export of the current conversation
+- workspace browser with local file open, create and save
+- multiple open-file tabs in the editor
+- rename and delete file operations from the integrated editor
+- attach the currently open workspace file directly into the chat prompt
+- ask Jarvis to edit the active file and review a unified diff before applying to the buffer
+- apply individual diff hunks from a Jarvis proposal instead of replacing the whole file at once
+- run a higher-level Jarvis task on the active file plus terminal context, with a suggested shell command and edit proposal in one flow
+- persistent bash terminal panel inside the PWA with `cd`, history, signals and interactive key forwarding
+- editor save shortcut with `Ctrl+S` or `Cmd+S`
 - installable app shell via manifest + service worker
 
 ## VS Code / Terminal Workflow
@@ -338,4 +347,32 @@ Operational smoke:
 
 ```bash
 scripts/obsidian_plugin_smoke.sh
+```
+
+## Aplicação Linux
+
+O Jarvis também pode ser usado como aplicativo Linux local em modo janela, sem depender só do navegador aberto em aba.
+
+Instalar o launcher desktop:
+
+```bash
+scripts/install_linux_app.sh
+```
+
+Abrir o Jarvis como app Linux:
+
+```bash
+jarvis-local
+```
+
+Ou diretamente:
+
+```bash
+scripts/run_linux_app.sh
+```
+
+Validação rápida do modo app Linux:
+
+```bash
+JARVIS_HOST=127.0.0.1 JARVIS_PORT=8000 scripts/linux_app_smoke.sh
 ```

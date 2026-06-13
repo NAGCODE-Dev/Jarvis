@@ -5,7 +5,7 @@ ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 LOG_DIR="$ROOT_DIR/logs"
 PID_FILE="$LOG_DIR/jarvis-core.pid"
 LOG_FILE="$LOG_DIR/jarvis-core.log"
-VENV_PYTHON="$ROOT_DIR/.venv/bin/python"
+PYTHON_BIN=$("$ROOT_DIR/scripts/_resolve_python.sh" "$ROOT_DIR" uvicorn fastapi httpx)
 HOST="${JARVIS_HOST:-127.0.0.1}"
 PORT="${JARVIS_PORT:-8000}"
 SEED_DEMO=1
@@ -37,11 +37,6 @@ while [ "$#" -gt 0 ]; do
 done
 
 mkdir -p "$LOG_DIR"
-
-if [ ! -x "$VENV_PYTHON" ]; then
-  echo "[jarvis] Virtual environment not found. Run scripts/install_host.sh first."
-  exit 1
-fi
 
 detect_available_memory_mb() {
   awk '/MemAvailable:/ { printf "%d\n", $2 / 1024 }' /proc/meminfo 2>/dev/null || echo 0
@@ -98,7 +93,7 @@ fi
 if [ ! -f "$PID_FILE" ]; then
   echo "[jarvis] Starting Jarvis core on ${HOST}:${PORT}"
   setsid env PYTHONPATH="$ROOT_DIR/apps/core" \
-    "$VENV_PYTHON" -m uvicorn jarvis.main:app --host "$HOST" --port "$PORT" \
+    "$PYTHON_BIN" -m uvicorn jarvis.main:app --host "$HOST" --port "$PORT" \
     </dev/null >"$LOG_FILE" 2>&1 &
   new_pid=$!
   echo "$new_pid" > "$PID_FILE"

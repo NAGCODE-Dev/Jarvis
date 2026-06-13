@@ -103,3 +103,103 @@ class SessionMessageRequest(BaseModel):
     display_content: str | None = None
     workspace: str | None = None
     temperature: float | None = None
+
+
+class SessionOperationRequest(BaseModel):
+    kind: str
+    title: str
+    path: str | None = None
+    command: str | None = None
+    detail: str | None = None
+    metadata: dict[str, Any] | None = None
+
+
+class SessionApprovalRequest(BaseModel):
+    kind: str
+    title: str
+    path: str | None = None
+    command: str | None = None
+    detail: str | None = None
+    metadata: dict[str, Any] | None = None
+    payload: dict[str, Any] | None = None
+
+
+class SessionApprovalActionRequest(BaseModel):
+    action: Literal["apply", "reject"] = "apply"
+
+
+class WorkspaceFileRequest(BaseModel):
+    path: str
+
+
+class WorkspaceFileWriteRequest(BaseModel):
+    path: str
+    content: str = ""
+
+
+class WorkspaceFileSnapshot(BaseModel):
+    path: str
+    content: str
+
+
+class WorkspaceDirectoryCreateRequest(BaseModel):
+    path: str
+
+
+class WorkspaceRenameRequest(BaseModel):
+    source_path: str
+    target_path: str
+
+
+class WorkspaceEditAssistRequest(BaseModel):
+    path: str
+    instruction: str
+    model: str = "jarvis-programador-safe"
+    content: str | None = None
+    workspace: str | None = None
+
+
+class WorkspaceTaskAssistRequest(BaseModel):
+    instruction: str
+    model: str = "jarvis-programador-safe"
+    path: str | None = None
+    content: str | None = None
+    workspace: str | None = None
+    terminal_output: str | None = None
+    execute_command: bool = False
+
+
+class WorkspaceBatchEditRequest(BaseModel):
+    instruction: str
+    model: str = "jarvis-programador-safe"
+    files: list[WorkspaceFileSnapshot]
+    workspace: str | None = None
+
+
+class WorkspaceTreeRequest(BaseModel):
+    path: str | None = None
+
+
+class TerminalRunRequest(BaseModel):
+    command: str
+    cwd: str | None = None
+
+
+class TerminalSessionCreateRequest(BaseModel):
+    cwd: str | None = None
+    cols: int = 120
+    rows: int = 32
+
+
+class TerminalSessionWriteRequest(BaseModel):
+    data: str
+    wait_ms: int = 120
+
+
+class TerminalSessionResizeRequest(BaseModel):
+    cols: int = 120
+    rows: int = 32
+
+
+class TerminalSignalRequest(BaseModel):
+    signal: Literal["int", "term", "kill"] = "int"

@@ -46,6 +46,8 @@ class SessionStore:
             "created_at": _now_iso(),
             "updated_at": _now_iso(),
             "messages": [],
+            "operations": [],
+            "approvals": [],
         }
         self._write(self._path(session_id), payload)
         return payload
@@ -62,6 +64,101 @@ class SessionStore:
         path = self._path(session_id)
         if path.exists():
             path.unlink()
+
+
+    def append_operation(
+        self,
+        session_id: str,
+        *,
+        kind: str,
+        title: str,
+        path: str | None = None,
+        command: str | None = None,
+        detail: str | None = None,
+        metadata: dict | None = None,
+    ) -> dict:
+        session = self.get_session(session_id)
+        operations = session.setdefault("operations", [])
+        operations.append(
+            {
+                "kind": kind,
+                "title": title,
+                "path": path,
+                "command": command,
+                "detail": detail,
+                "metadata": metadata or {},
+                "created_at": _now_iso(),
+            }
+        )
+        session["operations"] = operations[-200:]
+        return self.save_session(session_id, session)
+
+
+
+    def append_approval(
+        self,
+        session_id: str,
+        *,
+        kind: str,
+        title: str,
+        path: str | None = None,
+        command: str | None = None,
+        detail: str | None = None,
+        metadata: dict | None = None,
+        payload: dict | None = None,
+    ) -> dict:
+        session = self.get_session(session_id)
+        approvals = session.setdefault("approvals", [])
+        approvals.append(
+            {
+                "id": uuid4().hex,
+                "kind": kind,
+                "title": title,
+                "path": path,
+                "command": command,
+                "detail": detail,
+                "metadata": metadata or {},
+                "payload": payload or {},
+                "status": "pending",
+                "created_at": _now_iso(),
+                "updated_at": _now_iso(),
+            }
+        )
+        session["approvals"] = approvals[-80:]
+        return self.save_session(session_id, session)
+
+    def update_approval(
+        self,
+        session_id: str,
+        approval_id: str,
+        *,
+        status: str,
+        result: dict | None = None,
+        metadata_patch: dict | None = None,
+    ) -> tuple[dict, dict]:
+        session = self.get_session(session_id)
+        approvals = session.setdefault("approvals", [])
+        for approval in approvals:
+            if approval.get("id") != approval_id:
+                continue
+            approval["status"] = status
+            approval["updated_at"] = _now_iso()
+            if result is not None:
+                approval["result"] = result
+            if metadata_patch:
+                merged = dict(approval.get("metadata") or {})
+                merged.update(metadata_patch)
+                approval["metadata"] = merged
+            updated = self.save_session(session_id, session)
+            return updated, approval
+        raise FileNotFoundError(f"Approval not found: {approval_id}")
+
+    def get_approval(self, session_id: str, approval_id: str) -> dict:
+        session = self.get_session(session_id)
+        for approval in session.get("approvals", []):
+            if approval.get("id") == approval_id:
+                return approval
+        raise FileNotFoundError(f"Approval not found: {approval_id}")
 
     def append_exchange(
         self,

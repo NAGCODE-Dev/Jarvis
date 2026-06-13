@@ -1,0 +1,62 @@
+{
+  "crossfit": [
+    "crossfit",
+    "wod",
+    "snatch",
+    "clean",
+    "jerk",
+    "metcon",
+    "bar muscle up"
+  ],
+  "training": [
+    "treino",
+    "hipertrofia",
+    "força",
+    "forca",
+    "periodização",
+    "periodizacao",
+    "rpe",
+    "rir",
+    "vbt"
+  ],
+  "programming": [
+    "python",
+    "java",
+    "kotlin",
+    "android",
+    "api",
+    "docker",
+    "linux",
+    "git",
+    "backend",
+    "frontend"
+  ],
+  "jarvis": [
+    "jarvis",
+    "memória",
+    "memoria",
+    "rag",
+    "agent",
+    "llm",
+    "qdrant",
+    "ollama"
+  ],
+  "hardware": [
+    "hardware",
+    "pc",
+    "gpu",
+    "cpu",
+    "ram",
+    "ssd",
+    "fonte",
+    "placa mãe",
+    "placa mae"
+  ],
+  "personal": [
+    "minha rotina",
+    "meu objetivo",
+    "preferência",
+    "preferencia",
+    "pessoal"
+  ]
+}

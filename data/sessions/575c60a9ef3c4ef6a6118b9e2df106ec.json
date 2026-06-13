@@ -1,0 +1,20 @@
+{
+  "id": "575c60a9ef3c4ef6a6118b9e2df106ec",
+  "title": "PWA Smoke",
+  "model": "jarvis-programador-safe",
+  "workspace": "jarvis",
+  "created_at": "2026-06-13T00:52:33+00:00",
+  "updated_at": "2026-06-13T00:52:33+00:00",
+  "messages": [
+    {
+      "role": "user",
+      "content": "[WORKSPACE: jarvis]\nresponda somente OK",
+      "display_content": "pwa smoke"
+    },
+    {
+      "role": "assistant",
+      "content": "OK"
+    }
+  ],
+  "operations": []
+}
