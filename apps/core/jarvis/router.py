@@ -35,6 +35,28 @@ class JarvisRouter:
     def list_models(self) -> list[dict[str, str]]:
         return [{"id": key, "object": "model", "owned_by": "jarvis-local"} for key in AGENTS]
 
+    def describe_request(self, visible_model: str, messages: list[ChatMessage]) -> dict[str, object]:
+        agent = AGENTS.get(visible_model, AGENTS["jarvis"])
+        model_profile = self._model_profile(visible_model)
+        if agent.visible_model in {"jarvis", "jarvis-safe"}:
+            decision = self._route(messages, model_profile=model_profile)
+        else:
+            decision = RouteDecision(agent=agent, route_kind=agent.kind if agent.kind != "orchestrator" else "planner")
+
+        task_type = "coding" if decision.route_kind in {"coder", "complex-coder"} else "planning"
+        primary, fallback = self._resolve_primary(task_type, decision.agent, model_profile)
+        return {
+            "visible_model": visible_model,
+            "effective_agent": decision.agent.visible_model,
+            "route_kind": decision.route_kind,
+            "workspace": decision.workspace,
+            "use_rag": decision.use_rag,
+            "task_type": task_type,
+            "primary_model": primary,
+            "fallback_model": fallback,
+            "profile": model_profile,
+        }
+
     def complete(self, visible_model: str, messages: list[ChatMessage], temperature: float | None = None) -> str:
         agent = AGENTS.get(visible_model, AGENTS["jarvis"])
         model_profile = self._model_profile(visible_model)

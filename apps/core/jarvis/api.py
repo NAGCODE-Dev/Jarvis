@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 
 from jarvis.benchmark import BenchmarkService
+from jarvis.events import EventBus
 from jarvis.config import settings
 from jarvis.knowledge import KnowledgeService
 from jarvis.memory import MemoryAction, MemoryService
@@ -29,10 +30,14 @@ from jarvis.schemas import (
     SummarizeMemoryRequest,
     SessionApprovalActionRequest,
     SessionApprovalRequest,
+    SessionCheckpointCreateRequest,
     SessionCreateRequest,
     SessionMessageRequest,
     SessionOperationRequest,
+    SessionTaskCreateRequest,
+    SessionTaskUpdateRequest,
     SessionUpdateRequest,
+    TerminalNativeOpenRequest,
     TerminalRunRequest,
     TerminalSessionCreateRequest,
     TerminalSessionResizeRequest,
@@ -60,6 +65,84 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
     sessions = SessionStore()
     workspace = WorkspaceService()
     terminal = TerminalService()
+    events = EventBus()
+
+    def _persist_session_event(event):
+        session_id = event.payload.get("session_id")
+        if not session_id:
+            return
+        payload = {key: value for key, value in event.payload.items() if key != "session_id"}
+        try:
+            sessions.append_event(session_id, event_type=event.type, payload=payload, source=payload.get("source") or "event_bus")
+        except FileNotFoundError:
+            return
+
+    events.subscribe("*", _persist_session_event)
+
+    def emit_session_event(session_id: str, event_type: str, payload: dict | None = None, source: str = "jarvis") -> None:
+        enriched = {"session_id": session_id, **(payload or {}), "source": source}
+        events.emit(event_type, enriched)
+
+    def _maybe_create_automatic_checkpoint(event) -> None:
+        session_id = event.payload.get("session_id")
+        if not session_id:
+            return
+        event_type = event.type
+        title = None
+        summary = None
+
+        if event_type == "task_completed":
+            title = "Checkpoint automático: tarefa concluída"
+            summary = f"task_id={event.payload.get('task_id')} fase={event.payload.get('phase')}"
+        elif event_type == "approval_applied":
+            title = "Checkpoint automático: ação aplicada"
+            summary = f"approval_id={event.payload.get('approval_id')} tipo={event.payload.get('kind')}"
+        elif event_type == "workspace_changed":
+            action = str(event.payload.get("action") or "").strip()
+            if action not in {"rename_path", "delete_path"}:
+                return
+            title = "Checkpoint automático: mudança estrutural no workspace"
+            summary = f"action={action} path={event.payload.get('path')}"
+        elif event_type == "command_executed":
+            exit_code = event.payload.get("exit_code")
+            if exit_code in (None, 0):
+                return
+            title = "Checkpoint automático: comando com falha"
+            summary = f"exit_code={exit_code} command={event.payload.get('command')}"
+        else:
+            return
+
+        try:
+            session, checkpoint = sessions.create_checkpoint(
+                session_id,
+                title=title,
+                summary=summary,
+                source="auto",
+                trigger_event=event_type,
+            )
+            sessions.append_operation(
+                session_id,
+                kind="checkpoint_auto",
+                title=f"Gerou checkpoint automático {checkpoint.get('title') or checkpoint.get('id')}",
+                path=checkpoint.get("active_file"),
+                detail=checkpoint.get("summary"),
+                metadata={"checkpoint_id": checkpoint.get("id"), "trigger_event": event_type},
+            )
+            events.emit(
+                "checkpoint_created",
+                {
+                    "session_id": session_id,
+                    "checkpoint_id": checkpoint.get("id"),
+                    "title": checkpoint.get("title"),
+                    "source": "auto",
+                    "trigger_event": event_type,
+                },
+            )
+        except FileNotFoundError:
+            return
+
+    for auto_event in ("task_completed", "approval_applied", "workspace_changed", "command_executed"):
+        events.subscribe(auto_event, _maybe_create_automatic_checkpoint)
 
     def require_session(session_id: str) -> dict[str, object]:
         try:
@@ -533,6 +616,7 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
     def run_benchmark(request: BenchmarkRequest):
         results = benchmarks.run(request.models)
         registry.save_benchmark(results)
+        events.emit("benchmark_finished", {"models": request.models or [], "source": "api"})
         return {"status": "ok", "results": results}
 
     @router.get("/api/models/rankings")
@@ -548,24 +632,39 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
         return {"status": "ok", **workspace_call(workspace.read_file, path)}
 
     @router.post("/api/workspace/file")
-    def create_workspace_file(request: WorkspaceFileWriteRequest):
-        return {"status": "ok", **workspace_call(workspace.write_file, request.path, request.content, create=True)}
+    def create_workspace_file(request: WorkspaceFileWriteRequest, session_id: str | None = None):
+        result = workspace_call(workspace.write_file, request.path, request.content, create=True)
+        if session_id:
+            emit_session_event(session_id, "workspace_changed", {"path": request.path, "action": "create_file"}, source="workspace")
+        return {"status": "ok", **result}
 
     @router.post("/api/workspace/directory")
-    def create_workspace_directory(request: WorkspaceDirectoryCreateRequest):
-        return {"status": "ok", **workspace_call(workspace.create_directory, request.path)}
+    def create_workspace_directory(request: WorkspaceDirectoryCreateRequest, session_id: str | None = None):
+        result = workspace_call(workspace.create_directory, request.path)
+        if session_id:
+            emit_session_event(session_id, "workspace_changed", {"path": request.path, "action": "create_directory"}, source="workspace")
+        return {"status": "ok", **result}
 
     @router.put("/api/workspace/file")
-    def update_workspace_file(request: WorkspaceFileWriteRequest):
-        return {"status": "ok", **workspace_call(workspace.write_file, request.path, request.content, create=False)}
+    def update_workspace_file(request: WorkspaceFileWriteRequest, session_id: str | None = None):
+        result = workspace_call(workspace.write_file, request.path, request.content, create=False)
+        if session_id:
+            emit_session_event(session_id, "workspace_changed", {"path": request.path, "action": "update_file"}, source="workspace")
+        return {"status": "ok", **result}
 
     @router.post("/api/workspace/rename")
-    def rename_workspace_path(request: WorkspaceRenameRequest):
-        return {"status": "ok", **workspace_call(workspace.rename_path, request.source_path, request.target_path)}
+    def rename_workspace_path(request: WorkspaceRenameRequest, session_id: str | None = None):
+        result = workspace_call(workspace.rename_path, request.source_path, request.target_path)
+        if session_id:
+            emit_session_event(session_id, "workspace_changed", {"path": request.target_path, "from_path": request.source_path, "action": "rename_path"}, source="workspace")
+        return {"status": "ok", **result}
 
     @router.delete("/api/workspace/path")
-    def delete_workspace_path(path: str):
-        return {"status": "ok", **workspace_call(workspace.delete_path, path)}
+    def delete_workspace_path(path: str, session_id: str | None = None):
+        result = workspace_call(workspace.delete_path, path)
+        if session_id:
+            emit_session_event(session_id, "workspace_changed", {"path": path, "action": "delete_path"}, source="workspace")
+        return {"status": "ok", **result}
 
     @router.get("/api/workspace/search")
     def search_workspace(q: str, limit: int = 30):
@@ -656,24 +755,37 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
         }
 
     @router.post("/api/terminal/run")
-    def run_terminal_command(request: TerminalRunRequest):
-        return {"status": "ok", "result": workspace_call(terminal.run, request.command, cwd=request.cwd)}
+    def run_terminal_command(request: TerminalRunRequest, session_id: str | None = None):
+        result = workspace_call(terminal.run, request.command, cwd=request.cwd)
+        if session_id:
+            emit_session_event(session_id, "command_executed", {"command": request.command, "cwd": request.cwd, "exit_code": result.get("exit_code")}, source="terminal")
+        return {"status": "ok", "result": result}
+
+    @router.post("/api/terminal/native")
+    def open_native_terminal(request: TerminalNativeOpenRequest):
+        return {"status": "ok", "result": workspace_call(terminal.open_native, cwd=request.cwd)}
 
     @router.get("/api/terminal/sessions")
     def list_terminal_sessions():
         return {"status": "ok", "sessions": terminal.list_sessions()}
 
     @router.post("/api/terminal/sessions")
-    def create_terminal_session(request: TerminalSessionCreateRequest):
-        return {"status": "ok", "session": workspace_call(terminal.create_session, cwd=request.cwd, cols=request.cols, rows=request.rows)}
+    def create_terminal_session(request: TerminalSessionCreateRequest, session_id: str | None = None):
+        created = workspace_call(terminal.create_session, cwd=request.cwd, cols=request.cols, rows=request.rows)
+        if session_id:
+            emit_session_event(session_id, "terminal_session_created", {"terminal_session_id": created.get("session_id"), "cwd": created.get("cwd")}, source="terminal")
+        return {"status": "ok", "session": created}
 
     @router.get("/api/terminal/sessions/{session_id}/read")
     def read_terminal_session(session_id: str, wait_ms: int = 0):
         return {"status": "ok", "result": workspace_call(terminal.read, session_id, wait_ms=wait_ms)}
 
     @router.post("/api/terminal/sessions/{session_id}/write")
-    def write_terminal_session(session_id: str, request: TerminalSessionWriteRequest):
-        return {"status": "ok", "result": workspace_call(terminal.write, session_id, request.data, wait_ms=request.wait_ms)}
+    def write_terminal_session(session_id: str, request: TerminalSessionWriteRequest, chat_session_id: str | None = None):
+        result = workspace_call(terminal.write, session_id, request.data, wait_ms=request.wait_ms)
+        if chat_session_id:
+            emit_session_event(chat_session_id, "command_executed", {"terminal_session_id": session_id, "command": request.data.strip(), "exit_code": result.get("exit_code")}, source="terminal")
+        return {"status": "ok", "result": result}
 
     @router.post("/api/terminal/sessions/{session_id}/resize")
     def resize_terminal_session(session_id: str, request: TerminalSessionResizeRequest):
@@ -694,7 +806,14 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
 
     @router.post("/api/chat/sessions")
     def create_chat_session(request: SessionCreateRequest):
-        session = sessions.create_session(title=request.title, model=request.model, workspace=request.workspace)
+        session = sessions.create_session(
+            title=request.title,
+            model=request.model,
+            workspace=request.workspace,
+            mission=request.mission.model_dump() if request.mission else None,
+            ui_state=request.ui_state.model_dump() if request.ui_state else None,
+            meta=request.meta.model_dump() if request.meta else None,
+        )
         return {"status": "ok", "session": session}
 
     @router.get("/api/chat/sessions/{session_id}")
@@ -704,21 +823,68 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
     @router.put("/api/chat/sessions/{session_id}")
     def update_chat_session(session_id: str, request: SessionUpdateRequest):
         session = require_session(session_id)
+        workspace_changed = False
+        session_context_changed = False
         if "title" in request.model_fields_set:
             session["title"] = request.title
         if "model" in request.model_fields_set and request.model is not None:
             session["model"] = request.model
         if "workspace" in request.model_fields_set:
             session["workspace"] = request.workspace
+            workspace_changed = True
         if "messages" in request.model_fields_set:
             session["messages"] = [message.model_dump() for message in (request.messages or [])]
-        return {"status": "ok", "session": sessions.save_session(session_id, session)}
+        if "mission" in request.model_fields_set:
+            session["mission"] = sessions._normalize_mission(request.mission.model_dump() if request.mission else None)
+        if "ui_state" in request.model_fields_set:
+            session["ui_state"] = sessions._normalize_ui_state(request.ui_state.model_dump() if request.ui_state else None)
+            session_context_changed = True
+        if "meta" in request.model_fields_set:
+            session["meta"] = sessions._normalize_meta(request.meta.model_dump() if request.meta else None)
+        updated = sessions.save_session(session_id, session)
+        if workspace_changed:
+            emit_session_event(session_id, "workspace_changed", {"workspace": request.workspace}, source="api")
+        if session_context_changed:
+            emit_session_event(
+                session_id,
+                "session_context_updated",
+                {
+                    "active_file": (updated.get("ui_state") or {}).get("active_file"),
+                    "open_files": len((updated.get("ui_state") or {}).get("open_files") or []),
+                },
+                source="api",
+            )
+        return {"status": "ok", "session": sessions.get_session(session_id)}
 
     @router.delete("/api/chat/sessions/{session_id}")
     def delete_chat_session(session_id: str):
         require_session(session_id)
         sessions.delete_session(session_id)
         return {"status": "ok"}
+
+    @router.post("/api/chat/sessions/{session_id}/tasks")
+    def create_chat_session_task(session_id: str, request: SessionTaskCreateRequest):
+        require_session(session_id)
+        session, task = sessions.create_task(
+            session_id,
+            title=request.title,
+            objective=request.objective,
+            phase=request.phase,
+            status=request.status,
+            workspace=request.workspace,
+            notes=request.notes,
+        )
+        emit_session_event(session_id, "task_created", {"task_id": task["id"], "phase": task["phase"], "status": task["status"]}, source="api")
+        return {"status": "ok", "session": sessions.get_session(session_id), "task": task}
+
+    @router.put("/api/chat/sessions/{session_id}/tasks/{task_id}")
+    def update_chat_session_task(session_id: str, task_id: str, request: SessionTaskUpdateRequest):
+        require_session(session_id)
+        session, task = sessions.update_task(session_id, task_id, request.model_dump(exclude_none=True))
+        emit_session_event(session_id, "task_updated", {"task_id": task["id"], "phase": task["phase"], "status": task["status"]}, source="api")
+        if task.get("status") == "done":
+            emit_session_event(session_id, "task_completed", {"task_id": task["id"], "phase": task["phase"], "status": task["status"]}, source="api")
+        return {"status": "ok", "session": sessions.get_session(session_id), "task": task}
 
     @router.post("/api/chat/sessions/{session_id}/operations")
     def append_chat_session_operation(session_id: str, request: SessionOperationRequest):
@@ -732,7 +898,44 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
             detail=request.detail,
             metadata=request.metadata,
         )
+        emit_session_event(session_id, "operation_logged", {"kind": request.kind, "title": request.title, "path": request.path, "command": request.command}, source="api")
         return {"status": "ok", "session": session}
+
+    @router.post("/api/chat/sessions/{session_id}/checkpoints")
+    def create_chat_session_checkpoint(session_id: str, request: SessionCheckpointCreateRequest):
+        require_session(session_id)
+        session, checkpoint = sessions.create_checkpoint(
+            session_id,
+            title=request.title,
+            summary=request.summary,
+            source="manual",
+            trigger_event="manual",
+        )
+        session = sessions.append_operation(
+            session_id,
+            kind="checkpoint_create",
+            title=f"Criou checkpoint {checkpoint.get('title') or checkpoint.get('id')}",
+            path=checkpoint.get("active_file"),
+            detail=checkpoint.get("summary"),
+            metadata={"checkpoint_id": checkpoint.get("id")},
+        )
+        emit_session_event(session_id, "checkpoint_created", {"checkpoint_id": checkpoint.get("id"), "title": checkpoint.get("title")}, source="api")
+        return {"status": "ok", "session": sessions.get_session(session_id), "checkpoint": checkpoint}
+
+    @router.post("/api/chat/sessions/{session_id}/checkpoints/{checkpoint_id}/restore")
+    def restore_chat_session_checkpoint(session_id: str, checkpoint_id: str):
+        require_session(session_id)
+        session, checkpoint = sessions.restore_checkpoint(session_id, checkpoint_id)
+        session = sessions.append_operation(
+            session_id,
+            kind="checkpoint_restore",
+            title=f"Restaurou checkpoint {checkpoint.get('title') or checkpoint.get('id')}",
+            path=checkpoint.get("active_file"),
+            detail=checkpoint.get("summary"),
+            metadata={"checkpoint_id": checkpoint.get("id")},
+        )
+        emit_session_event(session_id, "checkpoint_restored", {"checkpoint_id": checkpoint.get("id"), "title": checkpoint.get("title")}, source="api")
+        return {"status": "ok", "session": sessions.get_session(session_id), "checkpoint": checkpoint}
 
     @router.post("/api/chat/sessions/{session_id}/approvals")
     def append_chat_session_approval(session_id: str, request: SessionApprovalRequest):
@@ -747,6 +950,7 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
             metadata=request.metadata,
             payload=request.payload,
         )
+        emit_session_event(session_id, "approval_created", {"kind": request.kind, "title": request.title, "path": request.path, "command": request.command}, source="api")
         return {"status": "ok", "session": session, "approval": session.get("approvals", [])[-1]}
 
     @router.post("/api/chat/sessions/{session_id}/approvals/{approval_id}")
@@ -765,7 +969,8 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
                 detail=approval.get("detail"),
                 metadata={"approval_id": approval_id, "kind": approval.get("kind")},
             )
-            return {"status": "ok", "session": session, "approval": updated_approval, "result": None}
+            emit_session_event(session_id, "approval_rejected", {"approval_id": approval_id, "kind": approval.get("kind")}, source="api")
+            return {"status": "ok", "session": sessions.get_session(session_id), "approval": updated_approval, "result": None}
 
         result: dict[str, object] | None = None
         approval_kind = str(approval.get("kind") or "").strip()
@@ -810,7 +1015,8 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
             detail=approval.get("detail"),
             metadata={"approval_id": approval_id, "kind": approval_kind, "result": result},
         )
-        return {"status": "ok", "session": session, "approval": updated_approval, "result": result}
+        emit_session_event(session_id, "approval_applied", {"approval_id": approval_id, "kind": approval_kind}, source="api")
+        return {"status": "ok", "session": sessions.get_session(session_id), "approval": updated_approval, "result": result}
 
     @router.post("/api/chat/sessions/{session_id}/message")
     def create_chat_session_message(session_id: str, request: SessionMessageRequest):
@@ -821,6 +1027,7 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
         existing_messages = session.get("messages", [])
         messages = [ChatMessage.model_validate(message) for message in existing_messages]
         messages.append(ChatMessage(role="user", content=user_content))
+        assistant_metadata = jarvis.describe_request(request.model, messages)
         content = jarvis.complete(request.model, messages, temperature=request.temperature)
         updated = sessions.append_exchange(
             session_id,
@@ -829,6 +1036,8 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
             assistant_content=content,
             model=request.model,
             workspace=request.workspace,
+            assistant_metadata=assistant_metadata,
+            user_attachments=[attachment.model_dump() for attachment in (request.attachments or [])],
         )
         memory.record_exchange(
             user_content=user_content,
@@ -837,6 +1046,7 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
             model=request.model,
             workspace=request.workspace,
         )
+        emit_session_event(session_id, "memory_updated", {"workspace": request.workspace, "model": request.model}, source="memory")
         return {"status": "ok", "session": updated, "message": content}
 
     @router.post("/api/chat/sessions/{session_id}/message/stream")
@@ -849,10 +1059,12 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
         messages = [ChatMessage.model_validate(message) for message in existing_messages]
         messages.append(ChatMessage(role="user", content=user_content))
 
+        assistant_metadata = jarvis.describe_request(request.model, messages)
+
         def event_stream():
             assistant_parts: list[str] = []
             try:
-                start_payload = {"type": "start", "session_id": session_id, "model": request.model}
+                start_payload = {"type": "start", "session_id": session_id, "model": request.model, "assistant_metadata": assistant_metadata}
                 yield f"data: {json.dumps(start_payload)}\n\n"
                 for chunk in jarvis.complete_stream(request.model, messages, temperature=request.temperature):
                     assistant_parts.append(chunk)
@@ -866,6 +1078,8 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
                     assistant_content=assistant_content,
                     model=request.model,
                     workspace=request.workspace,
+                    assistant_metadata=assistant_metadata,
+                    user_attachments=[attachment.model_dump() for attachment in (request.attachments or [])],
                 )
                 memory.record_exchange(
                     user_content=user_content,
@@ -874,6 +1088,7 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
                     model=request.model,
                     workspace=request.workspace,
                 )
+                emit_session_event(session_id, "memory_updated", {"workspace": request.workspace, "model": request.model}, source="memory")
                 done_payload = {"type": "done", "session": updated, "message": assistant_content}
                 yield f"data: {json.dumps(done_payload)}\n\n"
                 yield "data: [DONE]\n\n"

@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import fcntl
 import os
+import shlex
+import shutil
 from pathlib import Path
 import pty
 import select
@@ -158,6 +160,42 @@ class TerminalService:
         except OSError:
             pass
         self.sessions.pop(session_id, None)
+
+    def open_native(self, cwd: str | None = None) -> dict:
+        workdir = self._resolve(cwd)
+        shell = settings.terminal_shell
+        shell_name = Path(shell).name
+        shell_command = f"cd {shlex.quote(str(workdir))}; exec {shlex.quote(shell)} -i"
+
+        candidates = [
+            ["x-terminal-emulator", "-e", shell, "-lc", shell_command],
+            ["gnome-terminal", "--working-directory", str(workdir), "--", shell, "-lc", shell_command],
+            ["konsole", "--workdir", str(workdir), "-e", shell, "-lc", shell_command],
+            ["xfce4-terminal", "--working-directory", str(workdir), "-e", f"{shell} -lc {shlex.quote(shell_command)}"],
+            ["alacritty", "--working-directory", str(workdir), "-e", shell, "-lc", shell_command],
+            ["kitty", "--directory", str(workdir), shell, "-lc", shell_command],
+        ]
+
+        last_error: Exception | None = None
+        for candidate in candidates:
+            binary = candidate[0]
+            if shutil.which(binary) is None:
+                continue
+            try:
+                process = subprocess.Popen(candidate, cwd=workdir, start_new_session=True)
+                return {
+                    "cwd": "." if workdir == self.root else workdir.relative_to(self.root).as_posix(),
+                    "launcher": binary,
+                    "pid": process.pid,
+                    "shell": shell_name,
+                }
+            except Exception as exc:
+                last_error = exc
+                continue
+
+        if last_error is not None:
+            raise RuntimeError(f"Native terminal launch failed: {last_error}")
+        raise RuntimeError("No supported native terminal launcher found on this Linux system.")
 
     def run(self, command: str, cwd: str | None = None) -> dict:
         session = self.create_session(cwd=cwd)

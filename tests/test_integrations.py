@@ -55,23 +55,58 @@ def test_pwa_files_exist():
 def test_linux_app_files_exist():
     linux_dir = ROOT / "apps" / "linux"
     desktop_template = linux_dir / "jarvis-local.desktop.in"
+    canonical_launcher = ROOT / "scripts" / "jarvis.sh"
     launcher = ROOT / "scripts" / "run_linux_app.sh"
     installer = ROOT / "scripts" / "install_linux_app.sh"
+    deb_builder = ROOT / "scripts" / "build_deb.sh"
+    deb_smoke = ROOT / "scripts" / "deb_smoke.sh"
+    deb_installer = ROOT / "scripts" / "install_deb_local.sh"
 
     assert desktop_template.exists()
+    assert canonical_launcher.exists()
     assert launcher.exists()
     assert installer.exists()
+    assert deb_builder.exists()
+    assert deb_smoke.exists()
+    assert deb_installer.exists()
 
     desktop_text = desktop_template.read_text(encoding="utf-8")
+    canonical_launcher_text = canonical_launcher.read_text(encoding="utf-8")
     launcher_text = launcher.read_text(encoding="utf-8")
     installer_text = installer.read_text(encoding="utf-8")
+    deb_builder_text = deb_builder.read_text(encoding="utf-8")
+    deb_installer_text = deb_installer.read_text(encoding="utf-8")
 
     assert "Name=Jarvis Local" in desktop_text
     assert "scripts/run_linux_app.sh" in desktop_text
+    assert "scripts/jarvis.sh" in launcher_text
     assert '--app="$APP_URL"' in launcher_text
-    assert "boot_local.sh" in launcher_text
+    assert "scripts/jarvis.sh" in canonical_launcher_text
+    assert "run_cli_chat chat jarvis-safe" in canonical_launcher_text
     assert "jarvis-local.desktop" in installer_text
     assert "Jarvis Local" in installer_text
+    assert "/opt/jarvis-local/app" in deb_builder_text
+    assert "scripts/jarvis.sh app" in deb_builder_text
+    assert "OUTPUT_PATH" in deb_builder_text
+    assert "dpkg -i" in deb_installer_text
+
+
+def test_canonical_chat_wrappers_delegate_to_jarvis_launcher():
+    chat_wrapper = (ROOT / "scripts" / "chat.sh").read_text(encoding="utf-8")
+    code_wrapper = (ROOT / "scripts" / "code_chat.sh").read_text(encoding="utf-8")
+    research_wrapper = (ROOT / "scripts" / "research_chat.sh").read_text(encoding="utf-8")
+
+    assert 'scripts/jarvis.sh" chat' in chat_wrapper
+    assert 'scripts/jarvis.sh" code' in code_wrapper
+    assert 'scripts/jarvis.sh" research' in research_wrapper
+
+    chat_repl_wrapper = (ROOT / "scripts" / "chat_repl.sh").read_text(encoding="utf-8")
+    code_repl_wrapper = (ROOT / "scripts" / "code_chat_repl.sh").read_text(encoding="utf-8")
+    research_repl_wrapper = (ROOT / "scripts" / "research_chat_repl.sh").read_text(encoding="utf-8")
+
+    assert 'scripts/jarvis.sh" repl' in chat_repl_wrapper
+    assert 'scripts/jarvis.sh" code-repl' in code_repl_wrapper
+    assert 'scripts/jarvis.sh" research-repl' in research_repl_wrapper
 
 
 def test_pwa_contains_session_management_controls():
@@ -81,7 +116,45 @@ def test_pwa_contains_session_management_controls():
 
     assert 'id="delete-chat"' in html
     assert 'id="session-title"' in html
+    assert 'id="pin-session"' in html
+    assert 'id="archive-session"' in html
+    assert 'id="session-filters"' in html
+    assert 'data-session-filter="active"' in html
+    assert 'data-session-filter="archived"' in html
+    assert 'id="replay-session"' in html
+    assert 'id="replay-toggle"' in html
+    assert 'id="replay-next"' in html
+    assert 'id="replay-stop"' in html
+    assert 'id="replay-status"' in html
+    assert 'id="mode-chat"' in html
+    assert 'id="mode-build"' in html
+    assert 'id="mode-review"' in html
+    assert 'id="mode-focus"' in html
+    assert 'id="workbench-status"' in html
+    assert 'id="prompt-active-file"' in html
+    assert 'id="prompt-terminal-debug"' in html
+    assert 'id="prompt-create-file"' in html
+    assert 'id="prompt-next-step"' in html
+    assert 'id="refresh-mission-control"' in html
+    assert 'id="mission-briefing"' in html
+    assert 'id="mission-status"' in html
+    assert 'id="mission-next-actions"' in html
+    assert 'id="mission-objective"' in html
+    assert 'id="mission-status-input"' in html
+    assert 'id="mission-next-steps-input"' in html
+    assert 'id="save-mission"' in html
+    assert 'id="task-title"' in html
+    assert 'id="task-phase"' in html
+    assert 'id="create-task"' in html
+    assert 'id="task-board"' in html
+    assert 'id="open-command-palette"' in html
+    assert 'id="command-palette"' in html
+    assert 'id="command-palette-backdrop"' in html
+    assert 'id="command-palette-input"' in html
+    assert 'id="command-palette-results"' in html
+    assert 'id="close-command-palette"' in html
     assert "STORAGE_KEY" in js
+    assert "WORKBENCH_MODE_KEY" in js
     assert 'method: "DELETE"' in js
 
 
@@ -103,9 +176,15 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "buildAttachmentPrompt" in js
     assert "buildOperationalContextBlock" in js
     assert "renderComposerContextPreview" in js
+    assert "message-attachments" in js
+    assert "message-attachment-preview" in js
     assert "CONTEXT_PREFS_KEY" in js
     assert 'id="session-search"' in html
     assert 'id="export-chat"' in html
+    assert "normalizeSessionMeta" in js
+    assert "setSessionFilter" in js
+    assert "toggleCurrentSessionMeta" in js
+    assert "compareSessionsForSidebar" in js
     assert "exportCurrentSessionMarkdown" in js
     assert 'data-dropzone="idle"' in html
     assert "dragenter" in js
@@ -119,7 +198,12 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert 'id="open-path"' in html
     assert 'id="file-editor"' in html
     assert 'id="refresh-operations"' in html
+    assert 'id="create-checkpoint"' in html
+    assert 'id="session-checkpoints"' in html
+    assert 'id="session-timeline"' in html
+    assert 'id="timeline-filters"' in html
     assert 'id="session-operations"' in html
+    assert 'id="session-events"' in html
     assert 'id="editor-tabs"' in html
     assert 'id="editor-instruction"' in html
     assert 'id="editor-selection"' in html
@@ -142,6 +226,8 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert 'id="delete-file"' in html
     assert 'id="restart-terminal"' in html
     assert 'id="new-terminal"' in html
+    assert 'id="native-terminal"' in html
+    assert 'id="native-terminal-file"' in html
     assert 'id="close-terminal"' in html
     assert 'id="terminal-sessions"' in html
     assert 'id="interrupt-terminal"' in html
@@ -155,7 +241,17 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert 'id="git-diff"' in html
     assert 'id="git-log"' in html
     assert 'id="git-github"' in html
+    assert 'id="git-prs"' in html
+    assert 'id="git-issues"' in html
+    assert 'id="git-pr-view"' in html
+    assert 'id="git-pr-checkout"' in html
+    assert 'id="git-pr-diff"' in html
+    assert 'id="git-pr-create"' in html
+    assert 'id="git-issue-view"' in html
+    assert 'id="git-issue-create"' in html
     assert 'id="git-attach"' in html
+    assert 'id="github-target"' in html
+    assert 'id="github-title"' in html
     assert 'id="git-output"' in html
     assert 'id="refresh-approvals"' in html
     assert 'id="self-improve-active"' in html
@@ -181,12 +277,19 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "/api/workspace/task-cycle" in js
     assert "/api/workspace/path?path=" in js
     assert "/api/terminal/sessions" in js
+    assert "/api/terminal/native" in js
     assert "openWorkspaceFile" in js
     assert "mapTerminalKey" in js
     assert "renderEditorTabs" in js
     assert "renderTerminalSessions" in js
     assert "appendSessionOperation" in js
     assert "renderSessionOperations" in js
+    assert "renderSessionCheckpoints" in js
+    assert "renderSessionTimeline" in js
+    assert "setTimelineFilter" in js
+    assert "classifyTimelineItem" in js
+    assert "createSessionCheckpoint" in js
+    assert "restoreSessionCheckpoint" in js
     assert "renderWorkspaceSearchResults" in js
     assert "renderTaskAssist" in js
     assert "renderBatchProposal" in js
@@ -194,17 +297,59 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "rememberCurrentNote" in js
     assert "indexCurrentNote" in js
     assert "prepareChatFromCurrentNote" in js
+    assert "openNativeLinuxTerminal" in js
+    assert "openNativeLinuxTerminalForActiveFile" in js
     assert "runTerminalCommandFromInput" in js
     assert "renderRecentFiles" in js
     assert "renderSlashCommands" in js
+    assert "loadWorkbenchMode" in js
+    assert "setWorkbenchMode" in js
+    assert "preparePromptForActiveFile" in js
+    assert "preparePromptForTerminalDebug" in js
+    assert "preparePromptForCreateFile" in js
+    assert "preparePromptForNextStep" in js
+    assert "buildMissionModel" in js
+    assert "buildMissionActions" in js
+    assert "buildMissionBriefingText" in js
+    assert "buildMissionPrompt" in js
+    assert "renderMissionControl" in js
+    assert "normalizeMissionPayload" in js
+    assert "syncMissionInputs" in js
+    assert "persistMissionFromInputs" in js
+    assert "currentMission" in js
+    assert "currentTasks" in js
+    assert "currentEvents" in js
+    assert "createSessionTaskFromInputs" in js
+    assert "updateSessionTask" in js
+    assert "renderTaskBoard" in js
+    assert "renderEventStream" in js
+    assert "nextTaskPhase" in js
+    assert "buildCommandPaletteItems" in js
+    assert "getFilteredCommandPaletteItems" in js
+    assert "openCommandPalette" in js
+    assert "closeCommandPalette" in js
+    assert "moveCommandPaletteSelection" in js
+    assert "executeSelectedCommandPaletteItem" in js
+    assert "renderCommandPaletteResults" in js
+    assert "renderWorkbenchStatus" in js
     assert "renderCommandHistory" in js
     assert "trackCommandHistory" in js
     assert "renderGitOutput" in js
+    assert "startSessionReplay" in js
+    assert "toggleReplayPlayback" in js
+    assert "replayNextMessage" in js
+    assert "renderReplayStatus" in js
     assert "runGitCommand" in js
     assert "attachGitContextToChat" in js
+    assert "formatMessageMetadata" in js
     assert "latestGitContext" in js
     assert "renderApprovals" in js
     assert "queueApproval" in js
+    assert "queueGitHubApproval" in js
+    assert "readGitHubTarget" in js
+    assert "readGitHubTitle" in js
+    assert "buildGitHubBody" in js
+    assert "promptGitHubAction" in js
     assert "actOnApproval" in js
     assert "runSelfImproveActive" in js
     assert "queueSuggestedCommandApproval" in js
@@ -213,7 +358,21 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert '"/git-status"' in js
     assert '"/git-diff"' in js
     assert '"/git-log"' in js
+    assert '"/git-prs"' in js
+    assert '"/git-issues"' in js
+    assert '"/gh-pr-view"' in js
+    assert '"/gh-pr-checkout"' in js
+    assert '"/gh-pr-diff"' in js
+    assert '"/gh-pr-create"' in js
+    assert '"/gh-issue-view"' in js
+    assert '"/gh-issue-create"' in js
+    assert '"/linux-terminal"' in js
+    assert '"/linux-terminal-file"' in js
     assert '"/git-attach"' in js
+    assert '"/mode build"' in js
+    assert '"/explain-file"' in js
+    assert '"/debug-terminal"' in js
+    assert 'commandPaletteOpen' in js
     assert '"/queue-command"' in js
     assert '"/queue-edit"' in js
     assert '"/self-review"' in js
@@ -240,6 +399,10 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "editor-selection" in css
     assert "workspace-history-shell" in css
     assert "session-operation-card" in css
+    assert "session-checkpoint-card" in css
+    assert "session-timeline-card" in css
+    assert "timeline-filters" in css
+    assert "timeline-filter.active" in css
     assert "workspace-codex-grid" in css
     assert "workspace-obsidian-shell" in css
     assert "obsidian-status" in css
@@ -252,12 +415,45 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "git-shell" in css
     assert "git-header" in css
     assert "git-actions" in css
+    assert "git-form" in css
     assert "git-output" in css
+    assert "message-meta" in css
+    assert "replay-toolbar" in css
+    assert "replay-status" in css
     assert "approval-shell" in css
     assert "approval-header" in css
     assert "approvals-list" in css
     assert "approval-card" in css
     assert "approval-card-preview" in css
+    assert "workbench-topbar" in css
+    assert "workbench-mode-shell" in css
+    assert "workbench-modes" in css
+    assert "workbench-status" in css
+    assert "mission-control-shell" in css
+    assert "mission-control-header" in css
+    assert "mission-status" in css
+    assert "mission-card" in css
+    assert "mission-next-actions" in css
+    assert "mission-action" in css
+    assert "mission-editor-shell" in css
+    assert "mission-editor-row" in css
+    assert "#mission-next-steps-input" in css
+    assert "task-board-shell" in css
+    assert "task-board-creator" in css
+    assert "task-board" in css
+    assert "task-card" in css
+    assert "task-card-actions" in css
+    assert "event-stream-shell" in css
+    assert "session-events" in css
+    assert "session-event-card" in css
+    assert "status-pill" in css
+    assert "codex-prompt-dock" in css
+    assert "command-palette" in css
+    assert "command-palette-dialog" in css
+    assert "command-palette-results" in css
+    assert "command-palette-item" in css
+    assert "command-palette-empty" in css
+    assert "data-workbench-mode=\"chat\"" in css
     assert "slash-command-shell" in css
     assert "slash-commands" in css
     assert "slash-command-chip" in css

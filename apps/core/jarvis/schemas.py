@@ -84,10 +84,54 @@ class BenchmarkRequest(BaseModel):
     models: list[str] | None = None
 
 
+class SessionMissionRequest(BaseModel):
+    objective: str | None = None
+    status: str | None = None
+    next_steps: list[str] = Field(default_factory=list)
+
+
+class SessionUiStateRequest(BaseModel):
+    active_file: str | None = None
+    open_files: list[str] = Field(default_factory=list)
+    quick_flow_mode: str | None = None
+    quick_target_path: str | None = None
+    quick_goal: str | None = None
+    draft_prompt: str | None = None
+    editor_instruction: str | None = None
+    terminal_command: str | None = None
+    workbench_mode: str | None = None
+
+
+class SessionMetaRequest(BaseModel):
+    pinned: bool | None = None
+    archived: bool | None = None
+
+
+class SessionTaskCreateRequest(BaseModel):
+    title: str
+    objective: str | None = None
+    phase: Literal["planner", "executor", "verifier", "memory"] = "planner"
+    status: Literal["todo", "in_progress", "done", "blocked"] = "todo"
+    workspace: str | None = None
+    notes: str | None = None
+
+
+class SessionTaskUpdateRequest(BaseModel):
+    title: str | None = None
+    objective: str | None = None
+    phase: Literal["planner", "executor", "verifier", "memory"] | None = None
+    status: Literal["todo", "in_progress", "done", "blocked"] | None = None
+    workspace: str | None = None
+    notes: str | None = None
+
+
 class SessionCreateRequest(BaseModel):
     title: str | None = None
     model: str = "jarvis-safe"
     workspace: str | None = None
+    mission: SessionMissionRequest | None = None
+    ui_state: SessionUiStateRequest | None = None
+    meta: SessionMetaRequest | None = None
 
 
 class SessionUpdateRequest(BaseModel):
@@ -95,6 +139,16 @@ class SessionUpdateRequest(BaseModel):
     model: str | None = None
     workspace: str | None = None
     messages: list[ChatMessage] | None = None
+    mission: SessionMissionRequest | None = None
+    ui_state: SessionUiStateRequest | None = None
+    meta: SessionMetaRequest | None = None
+
+
+class SessionAttachmentRequest(BaseModel):
+    id: str | None = None
+    name: str
+    content: str
+    size: int | None = None
 
 
 class SessionMessageRequest(BaseModel):
@@ -103,6 +157,7 @@ class SessionMessageRequest(BaseModel):
     display_content: str | None = None
     workspace: str | None = None
     temperature: float | None = None
+    attachments: list[SessionAttachmentRequest] | None = None
 
 
 class SessionOperationRequest(BaseModel):
@@ -112,6 +167,11 @@ class SessionOperationRequest(BaseModel):
     command: str | None = None
     detail: str | None = None
     metadata: dict[str, Any] | None = None
+
+
+class SessionCheckpointCreateRequest(BaseModel):
+    title: str | None = None
+    summary: str | None = None
 
 
 class SessionApprovalRequest(BaseModel):
@@ -182,6 +242,10 @@ class WorkspaceTreeRequest(BaseModel):
 
 class TerminalRunRequest(BaseModel):
     command: str
+    cwd: str | None = None
+
+
+class TerminalNativeOpenRequest(BaseModel):
     cwd: str | None = None
 
 

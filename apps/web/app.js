@@ -5,6 +5,25 @@ const sessionsEl = document.querySelector("#sessions");
 const form = document.querySelector("#chat-form");
 const promptEl = document.querySelector("#prompt");
 const statusEl = document.querySelector("#status");
+const replaySessionButton = document.querySelector("#replay-session");
+const replayToggleButton = document.querySelector("#replay-toggle");
+const replayNextButton = document.querySelector("#replay-next");
+const replayStopButton = document.querySelector("#replay-stop");
+const replayStatusEl = document.querySelector("#replay-status");
+const missionStatusEl = document.querySelector("#mission-status");
+const missionNextActionsEl = document.querySelector("#mission-next-actions");
+const refreshMissionControlButton = document.querySelector("#refresh-mission-control");
+const missionBriefingButton = document.querySelector("#mission-briefing");
+const missionObjectiveInputEl = document.querySelector("#mission-objective");
+const missionStatusInputEl = document.querySelector("#mission-status-input");
+const missionNextStepsInputEl = document.querySelector("#mission-next-steps-input");
+const saveMissionButton = document.querySelector("#save-mission");
+const taskTitleEl = document.querySelector("#task-title");
+const taskPhaseEl = document.querySelector("#task-phase");
+const createTaskButton = document.querySelector("#create-task");
+const taskBoardEl = document.querySelector("#task-board");
+const workbenchStatusEl = document.querySelector("#workbench-status");
+const workbenchModeButtons = Array.from(document.querySelectorAll(".workbench-mode"));
 const attachmentsEl = document.querySelector("#attachments");
 const clearButton = document.querySelector("#clear-chat");
 const newChatButton = document.querySelector("#new-chat");
@@ -19,7 +38,27 @@ const attachFileButton = document.querySelector("#attach-file");
 const fileInput = document.querySelector("#file-input");
 const sessionTitleEl = document.querySelector("#session-title");
 const sessionSearchEl = document.querySelector("#session-search");
+const sessionFiltersEl = document.querySelector("#session-filters");
+const sessionFilterButtons = Array.from(document.querySelectorAll(".session-filter"));
+const pinSessionButton = document.querySelector("#pin-session");
+const archiveSessionButton = document.querySelector("#archive-session");
 const exportChatButton = document.querySelector("#export-chat");
+const promptActiveFileButton = document.querySelector("#prompt-active-file");
+const promptTerminalDebugButton = document.querySelector("#prompt-terminal-debug");
+const promptCreateFileButton = document.querySelector("#prompt-create-file");
+const promptNextStepButton = document.querySelector("#prompt-next-step");
+const quickTargetPathEl = document.querySelector("#quick-target-path");
+const quickGoalEl = document.querySelector("#quick-goal");
+const quickOpenTargetButton = document.querySelector("#quick-open-target");
+const quickBuildPromptButton = document.querySelector("#quick-build-prompt");
+const quickStageTaskButton = document.querySelector("#quick-stage-task");
+const quickFlowButtons = Array.from(document.querySelectorAll(".quick-flow-button"));
+const openCommandPaletteButton = document.querySelector("#open-command-palette");
+const commandPaletteEl = document.querySelector("#command-palette");
+const commandPaletteBackdropEl = document.querySelector("#command-palette-backdrop");
+const commandPaletteInputEl = document.querySelector("#command-palette-input");
+const commandPaletteResultsEl = document.querySelector("#command-palette-results");
+const closeCommandPaletteButton = document.querySelector("#close-command-palette");
 const quickActionButtons = Array.from(document.querySelectorAll(".quick-action"));
 const refreshFilesButton = document.querySelector("#refresh-files");
 const newFileButton = document.querySelector("#new-file");
@@ -32,7 +71,13 @@ const clearWorkspaceSearchButton = document.querySelector("#clear-workspace-sear
 const workspaceSearchResultsEl = document.querySelector("#workspace-search-results");
 const workspaceFilesEl = document.querySelector("#workspace-files");
 const refreshOperationsButton = document.querySelector("#refresh-operations");
+const createCheckpointButton = document.querySelector("#create-checkpoint");
 const sessionOperationsEl = document.querySelector("#session-operations");
+const sessionCheckpointsEl = document.querySelector("#session-checkpoints");
+const sessionTimelineFiltersEl = document.querySelector("#timeline-filters");
+const sessionTimelineFilterButtons = Array.from(document.querySelectorAll(".timeline-filter"));
+const sessionTimelineEl = document.querySelector("#session-timeline");
+const sessionEventsEl = document.querySelector("#session-events");
 const editorPathEl = document.querySelector("#editor-path");
 const editorTabsEl = document.querySelector("#editor-tabs");
 const editorInstructionEl = document.querySelector("#editor-instruction");
@@ -62,7 +107,12 @@ const terminalCommandEl = document.querySelector("#terminal-command");
 const runTerminalCommandButton = document.querySelector("#run-terminal-command");
 const sendTerminalCommandButton = document.querySelector("#send-terminal-command");
 const cdFileDirButton = document.querySelector("#cd-file-dir");
+const attachTerminalContextButton = document.querySelector("#attach-terminal-context");
+const askTerminalContextButton = document.querySelector("#ask-terminal-context");
+const planTerminalContextButton = document.querySelector("#plan-terminal-context");
 const newTerminalButton = document.querySelector("#new-terminal");
+const nativeTerminalButton = document.querySelector("#native-terminal");
+const nativeTerminalFileButton = document.querySelector("#native-terminal-file");
 const closeTerminalButton = document.querySelector("#close-terminal");
 const restartTerminalButton = document.querySelector("#restart-terminal");
 const interruptTerminalButton = document.querySelector("#interrupt-terminal");
@@ -83,8 +133,18 @@ const gitStatusButton = document.querySelector("#git-status");
 const gitDiffButton = document.querySelector("#git-diff");
 const gitLogButton = document.querySelector("#git-log");
 const gitGithubButton = document.querySelector("#git-github");
+const gitPrsButton = document.querySelector("#git-prs");
+const gitIssuesButton = document.querySelector("#git-issues");
+const gitPrViewButton = document.querySelector("#git-pr-view");
+const gitPrCheckoutButton = document.querySelector("#git-pr-checkout");
+const gitPrDiffButton = document.querySelector("#git-pr-diff");
+const gitPrCreateButton = document.querySelector("#git-pr-create");
+const gitIssueViewButton = document.querySelector("#git-issue-view");
+const gitIssueCreateButton = document.querySelector("#git-issue-create");
 const gitAttachButton = document.querySelector("#git-attach");
 const gitOutputEl = document.querySelector("#git-output");
+const githubTargetInput = document.querySelector("#github-target");
+const githubTitleInput = document.querySelector("#github-title");
 const refreshApprovalsButton = document.querySelector("#refresh-approvals");
 const selfImproveActiveButton = document.querySelector("#self-improve-active");
 const queueSuggestedCommandButton = document.querySelector("#queue-suggested-command");
@@ -98,6 +158,9 @@ let messages = [];
 let pendingAttachments = [];
 let allSessions = [];
 let currentSessionOperations = [];
+let currentSessionCheckpoints = [];
+let currentSessionMeta = { pinned: false, archived: false };
+let currentSessionFilter = "active";
 let dragDepth = 0;
 let workspaceTree = null;
 let workspaceSearchResults = [];
@@ -116,11 +179,32 @@ let recentFiles = [];
 let commandHistory = [];
 let latestGitContext = "";
 let currentApprovals = [];
+let currentMission = null;
+let currentTasks = [];
+let currentEvents = [];
+let currentSessionUiState = null;
+let sessionUiStateSaveTimer = null;
+let restoringSessionUiState = false;
+let replayMode = false;
+let replayPlaying = false;
+let replayIndex = 0;
+let replayTimer = null;
+let replaySourceMessages = [];
+let replayStartOffset = 0;
+let replayOriginLabel = "sessão inteira";
+let currentTimelineFilter = "all";
+let workbenchMode = "chat";
+let quickFlowMode = "create";
+let commandPaletteOpen = false;
+let commandPaletteIndex = 0;
+let commandPaletteItems = [];
 const STORAGE_KEY = "jarvis-pwa-current-session-id";
+const QUICK_FLOW_MODE_KEY = "jarvis-pwa-quick-flow-mode";
 const CONTEXT_PREFS_KEY = "jarvis-pwa-context-prefs";
 const RECENT_FILES_KEY = "jarvis-pwa-recent-files";
 const COMMAND_HISTORY_KEY = "jarvis-pwa-command-history";
 const OBSIDIAN_PREFS_KEY = "jarvis-pwa-obsidian-prefs";
+const WORKBENCH_MODE_KEY = "jarvis-pwa-workbench-mode";
 const SLASH_COMMANDS = [
   { label: "/help", mode: "run", value: "/help" },
   { label: "/open", mode: "fill", value: "/open apps/web/app.js" },
@@ -137,7 +221,23 @@ const SLASH_COMMANDS = [
   { label: "/git-status", mode: "run", value: "/git-status" },
   { label: "/git-diff", mode: "run", value: "/git-diff" },
   { label: "/git-log", mode: "run", value: "/git-log" },
+  { label: "/git-prs", mode: "run", value: "/git-prs" },
+  { label: "/git-issues", mode: "run", value: "/git-issues" },
+  { label: "/gh-pr-view", mode: "fill", value: "/gh-pr-view 123" },
+  { label: "/gh-pr-checkout", mode: "fill", value: "/gh-pr-checkout 123" },
+  { label: "/gh-pr-diff", mode: "fill", value: "/gh-pr-diff 123" },
+  { label: "/gh-pr-create", mode: "fill", value: "/gh-pr-create melhorar-fluxo-do-jarvis" },
+  { label: "/gh-issue-view", mode: "fill", value: "/gh-issue-view 123" },
+  { label: "/gh-issue-create", mode: "fill", value: "/gh-issue-create corrigir-lentidao-no-chat" },
+  { label: "/linux-terminal", mode: "run", value: "/linux-terminal" },
+  { label: "/linux-terminal-file", mode: "run", value: "/linux-terminal-file" },
+  { label: "/attach-terminal", mode: "run", value: "/attach-terminal" },
+  { label: "/fix-terminal", mode: "run", value: "/fix-terminal" },
+  { label: "/build-file", mode: "fill", value: "/build-file apps/web/new_panel.js :: criar um painel novo e funcional" },
   { label: "/git-attach", mode: "run", value: "/git-attach" },
+  { label: "/mode build", mode: "run", value: "/mode build" },
+  { label: "/explain-file", mode: "run", value: "/explain-file" },
+  { label: "/debug-terminal", mode: "run", value: "/debug-terminal" },
   { label: "/queue-command", mode: "run", value: "/queue-command" },
   { label: "/queue-edit", mode: "run", value: "/queue-edit" },
   { label: "/self-review", mode: "run", value: "/self-review" },
@@ -146,6 +246,22 @@ const SLASH_COMMANDS = [
 
 bootstrap().catch((error) => {
   statusEl.textContent = `Erro ao inicializar: ${error.message}`;
+});
+
+window.addEventListener("keydown", async (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+    event.preventDefault();
+    if (commandPaletteOpen) {
+      closeCommandPalette();
+    } else {
+      openCommandPalette();
+    }
+    return;
+  }
+  if (event.key === "Escape" && commandPaletteOpen) {
+    event.preventDefault();
+    closeCommandPalette();
+  }
 });
 
 window.addEventListener("beforeinstallprompt", (event) => {
@@ -172,6 +288,8 @@ clearButton.addEventListener("click", async () => {
       workspace: workspaceInput.value.trim() || null,
     }),
   });
+  stopSessionReplay({ render: false });
+  stopSessionReplay({ render: false });
   messages = [];
   renderMessages();
   await loadSessions();
@@ -181,16 +299,188 @@ async function loadCurrentSessionOperations() {
   if (!currentSessionId) return;
   const payload = await api(`/api/chat/sessions/${currentSessionId}`);
   currentSessionOperations = payload.session.operations || [];
+  currentSessionCheckpoints = payload.session.checkpoints || [];
   currentApprovals = payload.session.approvals || [];
+  currentMission = payload.session.mission || null;
+  currentTasks = payload.session.tasks || [];
+  currentEvents = payload.session.events || [];
+  currentSessionUiState = payload.session.ui_state || null;
+  currentSessionMeta = normalizeSessionMeta(payload.session.meta);
+  syncSessionMetaControls();
   renderSessionOperations();
+  renderSessionCheckpoints();
+  renderSessionTimeline();
   renderApprovals();
+  renderEventStream();
+  renderMissionControl();
 }
 
 async function loadCurrentSessionApprovals() {
   if (!currentSessionId) return;
   const payload = await api(`/api/chat/sessions/${currentSessionId}`);
   currentApprovals = payload.session.approvals || [];
+  currentSessionMeta = normalizeSessionMeta(payload.session.meta);
+  syncSessionMetaControls();
   renderApprovals();
+  renderEventStream();
+  renderMissionControl();
+}
+
+function renderEventStream() {
+  if (!sessionEventsEl) return;
+  sessionEventsEl.innerHTML = "";
+  if (!currentEvents.length) {
+    sessionEventsEl.textContent = "Nenhum evento emitido ainda.";
+    return;
+  }
+  for (const item of [...currentEvents].reverse().slice(0, 24)) {
+    const card = document.createElement("div");
+    card.className = "session-event-card";
+    const payloadText = Object.entries(item.payload || {})
+      .filter(([key]) => key !== "source")
+      .map(([key, value]) => `${key}: ${value}`)
+      .join(" | ");
+    card.textContent = [item.type || "event", payloadText, item.created_at].filter(Boolean).join("\n");
+    sessionEventsEl.appendChild(card);
+  }
+}
+
+function setTimelineFilter(filter) {
+  const normalized = ["all", "checkpoint", "operation", "event", "file", "terminal", "approval", "task"].includes(filter) ? filter : "all";
+  currentTimelineFilter = normalized;
+  sessionTimelineFilterButtons.forEach((button) => {
+    button.classList.toggle("active", (button.dataset.timelineFilter || "all") === normalized);
+  });
+  renderSessionTimeline();
+}
+
+function classifyTimelineItem(item) {
+  if (item.kind === "checkpoint") return "checkpoint";
+  if (item.kind === "event") {
+    const type = String(item.event_type || item.title || "").toLowerCase();
+    if (type.includes("task")) return "task";
+    if (type.includes("approval")) return "approval";
+    if (type.includes("command")) return "terminal";
+    if (type.includes("workspace")) return "file";
+    return "event";
+  }
+  const title = [item.title, item.detail].filter(Boolean).join(" ").toLowerCase();
+  if (title.includes("approval")) return "approval";
+  if (title.includes("terminal") || title.includes("comando") || title.includes("bash") || title.includes("exit_code")) return "terminal";
+  if (title.includes("tarefa") || title.includes("task")) return "task";
+  if (title.includes("arquivo") || title.includes("diff") || title.includes("workspace") || title.includes("pasta") || title.includes("path")) return "file";
+  return item.kind;
+}
+
+function renderSessionCheckpoints() {
+
+  if (!sessionCheckpointsEl) return;
+  sessionCheckpointsEl.innerHTML = "";
+  if (!currentSessionCheckpoints.length) {
+    sessionCheckpointsEl.textContent = "Nenhum checkpoint ainda.";
+    return;
+  }
+  for (const checkpoint of [...currentSessionCheckpoints].reverse().slice(0, 12)) {
+    const card = document.createElement("div");
+    card.className = "session-checkpoint-card";
+    const meta = [checkpoint.active_file, checkpoint.created_at].filter(Boolean).join("\n");
+    card.innerHTML = `<strong>${escapeHtml(checkpoint.title || "Checkpoint")}</strong><span>${escapeHtml(checkpoint.summary || meta || "checkpoint operacional")}</span>`;
+
+    const actions = document.createElement("div");
+    actions.className = "session-checkpoint-actions";
+
+    const restoreButton = document.createElement("button");
+    restoreButton.type = "button";
+    restoreButton.className = "secondary";
+    restoreButton.textContent = "Restaurar";
+    restoreButton.addEventListener("click", async () => {
+      await restoreSessionCheckpoint(checkpoint.id);
+    });
+
+    const replayButton = document.createElement("button");
+    replayButton.type = "button";
+    replayButton.className = "secondary";
+    replayButton.textContent = "Replay daqui";
+    replayButton.addEventListener("click", () => {
+      startSessionReplay({ fromIndex: checkpoint.message_count || 0, label: checkpoint.title || "checkpoint" });
+    });
+
+    actions.append(restoreButton, replayButton);
+    card.appendChild(actions);
+    sessionCheckpointsEl.appendChild(card);
+  }
+}
+
+function buildSessionTimelineItems() {
+  const operationItems = currentSessionOperations.map((item) => ({
+    kind: "operation",
+    created_at: item.created_at,
+    title: item.title || item.kind || "Operação",
+    detail: [item.path, item.command ? `$ ${item.command}` : null, item.detail].filter(Boolean).join("\n"),
+  }));
+  const eventItems = currentEvents.map((item) => ({
+    kind: "event",
+    created_at: item.created_at,
+    title: item.type || "event",
+    event_type: item.type || "event",
+    detail: Object.entries(item.payload || {}).filter(([key]) => key !== "source").map(([key, value]) => `${key}: ${value}`).join(" | "),
+  }));
+  const checkpointItems = currentSessionCheckpoints.map((item) => ({
+    kind: "checkpoint",
+    created_at: item.created_at,
+    title: item.title || "Checkpoint",
+    detail: [item.active_file, item.summary, item.source === "auto" ? `origem: ${item.trigger_event || "auto"}` : null].filter(Boolean).join("\n"),
+    checkpoint_id: item.id,
+    message_count: item.message_count || 0,
+  }));
+  return [...operationItems, ...eventItems, ...checkpointItems]
+    .filter((item) => item.created_at)
+    .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)));
+}
+
+function renderSessionTimeline() {
+  if (!sessionTimelineEl) return;
+  sessionTimelineEl.innerHTML = "";
+  const items = buildSessionTimelineItems()
+    .filter((item) => currentTimelineFilter === "all" || classifyTimelineItem(item) === currentTimelineFilter || item.kind === currentTimelineFilter)
+    .slice(0, 40);
+  if (!items.length) {
+    sessionTimelineEl.textContent = "Nenhuma atividade ainda para este filtro.";
+    return;
+  }
+  for (const item of items) {
+    const category = classifyTimelineItem(item);
+    const card = document.createElement("div");
+    card.className = `session-timeline-card ${item.kind} ${category}`;
+    const title = document.createElement("div");
+    title.className = "session-timeline-title";
+    title.textContent = `${category} · ${item.title}`;
+    const meta = document.createElement("div");
+    meta.className = "session-timeline-meta";
+    meta.textContent = [item.detail, item.created_at].filter(Boolean).join("\n");
+    card.append(title, meta);
+    if (item.kind === "checkpoint" && item.checkpoint_id) {
+      const actions = document.createElement("div");
+      actions.className = "session-timeline-actions";
+      const restoreButton = document.createElement("button");
+      restoreButton.type = "button";
+      restoreButton.className = "secondary";
+      restoreButton.textContent = "Restaurar";
+      restoreButton.addEventListener("click", async () => {
+        await restoreSessionCheckpoint(item.checkpoint_id);
+      });
+      const replayButton = document.createElement("button");
+      replayButton.type = "button";
+      replayButton.className = "secondary";
+      replayButton.textContent = "Replay daqui";
+      replayButton.addEventListener("click", () => {
+        startSessionReplay({ fromIndex: item.message_count || 0, label: item.title || "checkpoint" });
+      });
+      actions.append(restoreButton, replayButton);
+      card.appendChild(actions);
+    }
+    sessionTimelineEl.appendChild(card);
+  }
 }
 
 function renderSessionOperations() {
@@ -219,7 +509,12 @@ async function appendSessionOperation(operation) {
     body: JSON.stringify(operation),
   });
   currentSessionOperations = payload.session.operations || [];
+  currentSessionCheckpoints = payload.session.checkpoints || currentSessionCheckpoints;
   renderSessionOperations();
+  renderSessionCheckpoints();
+  renderSessionTimeline();
+  renderEventStream();
+  renderMissionControl();
 }
 
 
@@ -231,10 +526,12 @@ deleteButton.addEventListener("click", async () => {
   if (!currentSessionId) return;
   await api(`/api/chat/sessions/${currentSessionId}`, { method: "DELETE" });
   currentSessionId = null;
+  currentSessionMeta = { pinned: false, archived: false };
   sessionTitleEl.value = "";
   persistCurrentSessionId();
   messages = [];
   renderMessages();
+  syncSessionMetaControls();
   await loadSessions();
   if (!currentSessionId) {
     await createSession();
@@ -286,12 +583,148 @@ sessionSearchEl.addEventListener("input", () => {
   renderSessions(allSessions);
 });
 
+for (const button of sessionFilterButtons) {
+  button.addEventListener("click", () => {
+    setSessionFilter(button.dataset.sessionFilter || "active");
+  });
+}
+
+pinSessionButton?.addEventListener("click", async () => {
+  await toggleCurrentSessionMeta("pinned");
+});
+
+archiveSessionButton?.addEventListener("click", async () => {
+  await toggleCurrentSessionMeta("archived");
+});
+
 exportChatButton.addEventListener("click", () => {
   exportCurrentSessionMarkdown();
 });
 
 refreshOperationsButton.addEventListener("click", async () => {
   await loadCurrentSessionOperations();
+});
+
+createCheckpointButton.addEventListener("click", async () => {
+  await createSessionCheckpoint();
+});
+
+for (const button of sessionTimelineFilterButtons) {
+  button.addEventListener("click", () => {
+    setTimelineFilter(button.dataset.timelineFilter || "all");
+  });
+}
+
+replaySessionButton.addEventListener("click", () => {
+  startSessionReplay();
+});
+
+replayToggleButton.addEventListener("click", () => {
+  toggleReplayPlayback();
+});
+
+replayNextButton.addEventListener("click", () => {
+  replayNextMessage();
+});
+
+replayStopButton.addEventListener("click", () => {
+  stopSessionReplay();
+});
+
+for (const button of workbenchModeButtons) {
+  button.addEventListener("click", () => {
+    setWorkbenchMode(button.dataset.mode || "chat");
+  });
+}
+
+promptActiveFileButton.addEventListener("click", () => {
+  preparePromptForActiveFile();
+});
+
+promptTerminalDebugButton.addEventListener("click", () => {
+  preparePromptForTerminalDebug();
+});
+
+promptCreateFileButton.addEventListener("click", async () => {
+  await preparePromptForCreateFile();
+});
+
+promptNextStepButton.addEventListener("click", () => {
+  preparePromptForNextStep();
+});
+
+quickOpenTargetButton.addEventListener("click", async () => {
+  await openQuickFlowTarget();
+});
+
+quickBuildPromptButton.addEventListener("click", async () => {
+  await runQuickFlowPrompt();
+});
+
+quickStageTaskButton.addEventListener("click", async () => {
+  await stageQuickFlowInEditor();
+});
+
+for (const button of quickFlowButtons) {
+  button.addEventListener("click", async () => {
+    await setQuickFlowMode(button.dataset.quickFlow || "create");
+  });
+}
+
+refreshMissionControlButton.addEventListener("click", () => {
+  renderMissionControl();
+  announceAssistantMessage(buildMissionBriefingText());
+});
+
+missionBriefingButton.addEventListener("click", () => {
+  primePrompt(buildMissionPrompt(), { mode: "chat", activeFile: Boolean(getCurrentEditor()), terminal: true, search: true });
+});
+
+saveMissionButton.addEventListener("click", async () => {
+  await persistMissionFromInputs();
+});
+
+createTaskButton.addEventListener("click", async () => {
+  await createSessionTaskFromInputs();
+});
+
+openCommandPaletteButton.addEventListener("click", () => {
+  openCommandPalette();
+});
+
+closeCommandPaletteButton.addEventListener("click", () => {
+  closeCommandPalette();
+});
+
+commandPaletteBackdropEl.addEventListener("click", () => {
+  closeCommandPalette();
+});
+
+commandPaletteInputEl.addEventListener("input", () => {
+  commandPaletteIndex = 0;
+  renderCommandPaletteResults();
+});
+
+commandPaletteInputEl.addEventListener("keydown", async (event) => {
+  if (event.key === "ArrowDown") {
+    event.preventDefault();
+    moveCommandPaletteSelection(1);
+    return;
+  }
+  if (event.key === "ArrowUp") {
+    event.preventDefault();
+    moveCommandPaletteSelection(-1);
+    return;
+  }
+  if (event.key === "Enter") {
+    event.preventDefault();
+    await executeSelectedCommandPaletteItem();
+    return;
+  }
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeCommandPalette();
+  }
 });
 
 refreshFilesButton.addEventListener("click", () => {
@@ -328,6 +761,38 @@ gitGithubButton.addEventListener("click", async () => {
   await loadGitContext("github");
 });
 
+gitPrsButton.addEventListener("click", async () => {
+  await loadGitContext("prs");
+});
+
+gitIssuesButton.addEventListener("click", async () => {
+  await loadGitContext("issues");
+});
+
+gitPrViewButton.addEventListener("click", async () => {
+  await promptGitHubAction("pr-view");
+});
+
+gitPrCheckoutButton.addEventListener("click", async () => {
+  await promptGitHubAction("pr-checkout");
+});
+
+gitPrDiffButton.addEventListener("click", async () => {
+  await promptGitHubAction("pr-diff");
+});
+
+gitPrCreateButton.addEventListener("click", async () => {
+  await promptGitHubAction("pr-create");
+});
+
+gitIssueViewButton.addEventListener("click", async () => {
+  await promptGitHubAction("issue-view");
+});
+
+gitIssueCreateButton.addEventListener("click", async () => {
+  await promptGitHubAction("issue-create");
+});
+
 gitAttachButton.addEventListener("click", async () => {
   await attachGitContextToChat();
 });
@@ -361,7 +826,7 @@ obsidianAutoIndexCheckbox.addEventListener("change", () => {
 newFileButton.addEventListener("click", async () => {
   const path = window.prompt("Novo arquivo relativo ao workspace:", "notes/todo.md");
   if (!path) return;
-  await api("/api/workspace/file", {
+  await api(`/api/workspace/file?session_id=${encodeURIComponent(currentSessionId || "")}`, {
     method: "POST",
     body: JSON.stringify({ path: path.trim(), content: "" }),
   });
@@ -373,7 +838,7 @@ newFileButton.addEventListener("click", async () => {
 newFolderButton.addEventListener("click", async () => {
   const path = window.prompt("Nova pasta relativa ao workspace:", "notes");
   if (!path) return;
-  await api("/api/workspace/directory", {
+  await api(`/api/workspace/directory?session_id=${encodeURIComponent(currentSessionId || "")}`, {
     method: "POST",
     body: JSON.stringify({ path: path.trim() }),
   });
@@ -652,7 +1117,7 @@ renameFileButton.addEventListener("click", async () => {
   if (!currentOpenFilePath) return;
   const targetPath = window.prompt("Novo caminho relativo para o arquivo atual:", currentOpenFilePath);
   if (!targetPath || targetPath.trim() === currentOpenFilePath) return;
-  await api("/api/workspace/rename", {
+  await api(`/api/workspace/rename?session_id=${encodeURIComponent(currentSessionId || "")}`, {
     method: "POST",
     body: JSON.stringify({ source_path: currentOpenFilePath, target_path: targetPath.trim() }),
   });
@@ -681,7 +1146,7 @@ renameFileButton.addEventListener("click", async () => {
 deleteFileButton.addEventListener("click", async () => {
   if (!currentOpenFilePath) return;
   if (!window.confirm(`Excluir ${currentOpenFilePath}?`)) return;
-  await api(`/api/workspace/path?path=${encodeURIComponent(currentOpenFilePath)}`, {
+  await api(`/api/workspace/path?path=${encodeURIComponent(currentOpenFilePath)}&session_id=${encodeURIComponent(currentSessionId || "")}`, {
     method: "DELETE",
   });
   const deletedPath = currentOpenFilePath;
@@ -696,6 +1161,14 @@ restartTerminalButton.addEventListener("click", async () => {
 
 newTerminalButton.addEventListener("click", async () => {
   await createTerminalSession();
+});
+
+nativeTerminalButton.addEventListener("click", async () => {
+  await openNativeLinuxTerminal();
+});
+
+nativeTerminalFileButton.addEventListener("click", async () => {
+  await openNativeLinuxTerminalForActiveFile();
 });
 
 closeTerminalButton.addEventListener("click", async () => {
@@ -726,6 +1199,18 @@ sendTerminalCommandButton.addEventListener("click", async () => {
 
 cdFileDirButton.addEventListener("click", async () => {
   await jumpTerminalToActiveFileDir();
+});
+
+attachTerminalContextButton.addEventListener("click", async () => {
+  await attachTerminalSnapshot();
+});
+
+askTerminalContextButton.addEventListener("click", async () => {
+  await preparePromptForTerminalFix();
+});
+
+planTerminalContextButton.addEventListener("click", async () => {
+  await createTerminalFollowupTask();
 });
 
 rememberNoteButton.addEventListener("click", async () => {
@@ -879,14 +1364,22 @@ form.addEventListener("submit", async (event) => {
       content: attachmentPrompt,
       displayContent: prompt,
       workspace: workspaceInput.value.trim() || null,
+      attachments: pendingAttachments.map((attachment) => ({
+        id: attachment.id,
+        name: attachment.name,
+        content: attachment.content,
+        size: attachment.size,
+      })),
     });
     promptEl.value = "";
     pendingAttachments = [];
     renderAttachments();
+    stopSessionReplay({ render: false });
     messages = response.session.messages || [];
     renderMessages();
     await loadSessions();
   } catch (error) {
+    stopSessionReplay({ render: false });
     messages = messages.slice(0, Math.max(0, messages.length - 2));
     renderMessages();
     appendMessageElement("assistant", `Erro ao falar com o Jarvis: ${error.message}`);
@@ -894,6 +1387,26 @@ form.addEventListener("submit", async (event) => {
     setPending(false);
     loadStatus();
   }
+});
+
+promptEl.addEventListener("input", () => {
+  scheduleSessionUiStateSave();
+});
+
+quickTargetPathEl.addEventListener("input", () => {
+  scheduleSessionUiStateSave();
+});
+
+quickGoalEl.addEventListener("input", () => {
+  scheduleSessionUiStateSave();
+});
+
+editorInstructionEl.addEventListener("input", () => {
+  scheduleSessionUiStateSave();
+});
+
+terminalCommandEl.addEventListener("input", () => {
+  scheduleSessionUiStateSave();
 });
 
 promptEl.addEventListener("keydown", (event) => {
@@ -934,14 +1447,19 @@ async function bootstrap() {
   loadObsidianPrefs();
   loadRecentFiles();
   loadCommandHistory();
+  loadWorkbenchMode();
+  loadQuickFlowMode();
   renderMessages();
   renderRecentFiles();
+  renderMissionControl();
   renderCommandHistory();
   renderGitOutput();
   renderApprovals();
   renderSlashCommands();
   renderObsidianStatus();
+  syncQuickFlowUi();
   renderComposerContextPreview();
+  renderWorkbenchStatus();
   await loadStatus();
   registerServiceWorker();
   await loadWorkspaceTree();
@@ -950,6 +1468,7 @@ async function bootstrap() {
   if (!currentSessionId) {
     await createSession();
   }
+  setWorkbenchMode(workbenchMode, { persist: false });
 }
 
 async function loadSessions() {
@@ -975,15 +1494,29 @@ async function createSession() {
     }),
   });
   currentSessionId = payload.session.id;
+  currentMission = payload.session.mission || null;
+  currentTasks = payload.session.tasks || [];
+  currentEvents = payload.session.events || [];
+  currentSessionUiState = payload.session.ui_state || null;
+  currentSessionMeta = normalizeSessionMeta(payload.session.meta);
   persistCurrentSessionId();
   messages = [];
+  clearSessionWorkspaceState();
   renderMessages();
   await loadSessions();
   await selectSession(currentSessionId);
   currentSessionOperations = [];
+  currentSessionCheckpoints = payload.session.checkpoints || [];
   currentApprovals = [];
+  currentMission = payload.session.mission || null;
+  currentTasks = payload.session.tasks || [];
+  currentEvents = payload.session.events || [];
+  syncSessionMetaControls();
   renderSessionOperations();
+  renderSessionCheckpoints();
+  renderSessionTimeline();
   renderApprovals();
+  renderEventStream();
 }
 
 async function selectSession(sessionId) {
@@ -1002,28 +1535,110 @@ async function selectSession(sessionId) {
   const session = payload.session;
   currentSessionId = session.id;
   persistCurrentSessionId();
+  stopSessionReplay({ render: false });
+  clearSessionWorkspaceState();
   messages = session.messages || [];
   modelSelect.value = session.model || "jarvis-safe";
   workspaceInput.value = session.workspace || "";
   sessionTitleEl.value = session.title || "Nova conversa";
   renderMessages();
   currentSessionOperations = session.operations || [];
+  currentSessionCheckpoints = session.checkpoints || [];
   currentApprovals = session.approvals || [];
+  currentMission = session.mission || null;
+  currentTasks = session.tasks || [];
+  currentEvents = session.events || [];
+  currentSessionUiState = session.ui_state || null;
+  currentSessionMeta = normalizeSessionMeta(session.meta);
+  syncSessionMetaControls();
   renderSessionOperations();
+  renderSessionCheckpoints();
+  renderSessionTimeline();
   renderApprovals();
   highlightSelectedSession();
+  await restoreSessionUiState(session);
+  renderWorkbenchStatus();
+  renderMissionControl();
+}
+
+function normalizeSessionMeta(meta = null) {
+  return {
+    pinned: Boolean(meta?.pinned),
+    archived: Boolean(meta?.archived),
+  };
+}
+
+function normalizeSessionFilter(filter) {
+  return ["active", "pinned", "archived", "all"].includes(filter) ? filter : "active";
+}
+
+function setSessionFilter(filter) {
+  currentSessionFilter = normalizeSessionFilter(filter);
+  sessionFilterButtons.forEach((button) => {
+    button.classList.toggle("active", (button.dataset.sessionFilter || "active") === currentSessionFilter);
+  });
+  renderSessions(allSessions);
+}
+
+function matchSessionFilter(session) {
+  const meta = normalizeSessionMeta(session.meta || session);
+  if (currentSessionFilter === "pinned") return meta.pinned && !meta.archived;
+  if (currentSessionFilter === "archived") return meta.archived;
+  if (currentSessionFilter === "all") return true;
+  return !meta.archived;
+}
+
+function compareSessionsForSidebar(left, right) {
+  const leftMeta = normalizeSessionMeta(left.meta || left);
+  const rightMeta = normalizeSessionMeta(right.meta || right);
+  if (leftMeta.pinned !== rightMeta.pinned) return leftMeta.pinned ? -1 : 1;
+  return String(right.updated_at || "").localeCompare(String(left.updated_at || ""));
+}
+
+function syncSessionMetaControls() {
+  if (pinSessionButton) {
+    pinSessionButton.textContent = currentSessionMeta.pinned ? "Desfixar" : "Fixar";
+  }
+  if (archiveSessionButton) {
+    archiveSessionButton.textContent = currentSessionMeta.archived ? "Restaurar" : "Arquivar";
+  }
+}
+
+async function toggleCurrentSessionMeta(field) {
+  if (!currentSessionId) return;
+  const nextMeta = {
+    ...normalizeSessionMeta(currentSessionMeta),
+    [field]: !currentSessionMeta[field],
+  };
+  const payload = await api(`/api/chat/sessions/${currentSessionId}`, {
+    method: "PUT",
+    body: JSON.stringify({ meta: nextMeta }),
+  });
+  currentSessionMeta = normalizeSessionMeta(payload.session.meta);
+  if (field === "archived") {
+    if (currentSessionMeta.archived && currentSessionFilter === "active") {
+      setSessionFilter("archived");
+    } else if (!currentSessionMeta.archived && currentSessionFilter === "archived") {
+      setSessionFilter("active");
+    }
+  }
+  syncSessionMetaControls();
+  await loadSessions();
 }
 
 function renderSessions(sessions) {
   sessionsEl.innerHTML = "";
   const term = (sessionSearchEl.value || "").trim().toLowerCase();
-  const filtered = sessions.filter((session) => {
-    if (!term) return true;
-    return [session.title || "", session.model || "", session.workspace || ""]
-      .join(" ")
-      .toLowerCase()
-      .includes(term);
-  });
+  const filtered = sessions
+    .filter((session) => matchSessionFilter(session))
+    .filter((session) => {
+      if (!term) return true;
+      return [session.title || "", session.model || "", session.workspace || "", session.mission_objective || "", session.preview || ""]
+        .join(" ")
+        .toLowerCase()
+        .includes(term);
+    })
+    .sort(compareSessionsForSidebar);
   if (!filtered.length) {
     sessionsEl.textContent = "Nenhuma conversa ainda.";
     return;
@@ -1033,9 +1648,21 @@ function renderSessions(sessions) {
     button.type = "button";
     button.className = "session-item";
     button.dataset.sessionId = session.id;
+    const tags = [
+      session.pinned ? "fixada" : null,
+      session.archived ? "arquivada" : null,
+      session.workspace ? `ws:${session.workspace}` : null,
+      session.active_tasks ? `${session.active_tasks} tarefa(s)` : null,
+      session.checkpoint_count ? `${session.checkpoint_count} ckpt` : null,
+    ].filter(Boolean).join(" · ");
+    const sessionMeta = [session.model || "jarvis-safe", session.active_file ? `arquivo ${session.active_file}` : null, session.mission_status || null, session.updated_at || null]
+      .filter(Boolean)
+      .join(" · ");
     button.innerHTML = `
       <strong>${escapeHtml(session.title || "Nova conversa")}</strong>
-      <span>${escapeHtml(session.model || "jarvis-safe")}</span>
+      <span>${escapeHtml(sessionMeta)}</span>
+      ${tags ? `<small>${escapeHtml(tags)}</small>` : ""}
+      ${session.preview ? `<small>${escapeHtml(session.preview)}</small>` : ""}
     `;
     button.addEventListener("click", () => selectSession(session.id));
     sessionsEl.appendChild(button);
@@ -1047,6 +1674,860 @@ function highlightSelectedSession() {
   for (const node of sessionsEl.querySelectorAll(".session-item")) {
     node.classList.toggle("active", node.dataset.sessionId === currentSessionId);
   }
+}
+
+function buildSessionUiStateSnapshot() {
+  return {
+    active_file: currentOpenFilePath || null,
+    open_files: openEditors.map((editor) => editor.path),
+    quick_flow_mode: quickFlowMode || null,
+    quick_target_path: (quickTargetPathEl?.value || "").trim() || null,
+    quick_goal: (quickGoalEl?.value || "").trim() || null,
+    draft_prompt: (promptEl?.value || "").trim() || null,
+    editor_instruction: (editorInstructionEl?.value || "").trim() || null,
+    terminal_command: (terminalCommandEl?.value || "").trim() || null,
+    workbench_mode: workbenchMode || null,
+  };
+}
+
+function clearSessionWorkspaceState() {
+  openEditors = [];
+  currentOpenFilePath = null;
+  pendingEditProposal = null;
+  pendingBatchProposal = null;
+  pendingTaskAssist = null;
+  editorSelection = null;
+  fileEditorEl.value = "";
+  editorInstructionEl.value = "";
+  renderEditorTabs();
+  syncEditorFromState();
+  renderWorkspaceTree();
+}
+
+async function persistSessionUiState() {
+  if (!currentSessionId || restoringSessionUiState) return;
+  const snapshot = buildSessionUiStateSnapshot();
+  currentSessionUiState = snapshot;
+  const payload = await api(`/api/chat/sessions/${currentSessionId}`, {
+    method: "PUT",
+    body: JSON.stringify({ ui_state: snapshot }),
+  });
+  currentSessionUiState = payload.session.ui_state || snapshot;
+}
+
+function scheduleSessionUiStateSave() {
+  if (!currentSessionId || restoringSessionUiState) return;
+  if (sessionUiStateSaveTimer) {
+    window.clearTimeout(sessionUiStateSaveTimer);
+  }
+  sessionUiStateSaveTimer = window.setTimeout(() => {
+    sessionUiStateSaveTimer = null;
+    persistSessionUiState().catch((error) => {
+      console.warn("jarvis ui_state persist failed", error);
+    });
+  }, 250);
+}
+
+async function restoreSessionUiState(session) {
+  restoringSessionUiState = true;
+  try {
+    const uiState = session?.ui_state || {};
+    currentSessionUiState = uiState;
+    quickFlowMode = normalizeQuickFlowMode(uiState.quick_flow_mode || quickFlowMode);
+    if (quickTargetPathEl) quickTargetPathEl.value = uiState.quick_target_path || "";
+    if (quickGoalEl) quickGoalEl.value = uiState.quick_goal || "";
+    promptEl.value = uiState.draft_prompt || "";
+    editorInstructionEl.value = uiState.editor_instruction || "";
+    terminalCommandEl.value = uiState.terminal_command || "";
+    setWorkbenchMode(uiState.workbench_mode || workbenchMode, { persist: false });
+    syncQuickFlowUi();
+
+    const paths = Array.isArray(uiState.open_files) ? uiState.open_files.slice(0, 8) : [];
+    for (const path of paths) {
+      try {
+        await openWorkspaceFile(path, { persist: false });
+      } catch {
+        // ignore missing files during restore
+      }
+    }
+    if (uiState.active_file) {
+      const existing = openEditors.find((editor) => editor.path === uiState.active_file);
+      if (existing) {
+        currentOpenFilePath = existing.path;
+        syncEditorFromState();
+        renderEditorTabs();
+      }
+    }
+    renderComposerContextPreview();
+    renderWorkbenchStatus();
+  } finally {
+    restoringSessionUiState = false;
+  }
+}
+
+function phaseLabel(phase) {
+  return ["planner", "executor", "verifier", "memory"].includes(phase) ? phase : "planner";
+}
+
+function nextTaskPhase(phase) {
+  const phases = ["planner", "executor", "verifier", "memory"];
+  const index = phases.indexOf(phaseLabel(phase));
+  return phases[Math.min(index + 1, phases.length - 1)];
+}
+
+async function createSessionTaskFromInputs() {
+  if (!currentSessionId) return;
+  const title = (taskTitleEl.value || "").trim();
+  if (!title) return;
+  const payload = await api(`/api/chat/sessions/${currentSessionId}/tasks`, {
+    method: "POST",
+    body: JSON.stringify({
+      title,
+      objective: missionObjectiveInputEl.value.trim() || null,
+      phase: taskPhaseEl.value || "planner",
+      status: "todo",
+      workspace: workspaceInput.value.trim() || null,
+    }),
+  });
+  currentTasks = payload.session.tasks || [];
+  currentEvents = payload.session.events || [];
+  taskTitleEl.value = "";
+  renderMissionControl();
+  await loadSessions();
+  announceAssistantMessage(`Tarefa criada: ${title}`);
+}
+
+async function updateSessionTask(taskId, patch) {
+  if (!currentSessionId) return;
+  const payload = await api(`/api/chat/sessions/${currentSessionId}/tasks/${taskId}`, {
+    method: "PUT",
+    body: JSON.stringify(patch),
+  });
+  currentTasks = payload.session.tasks || [];
+  currentEvents = payload.session.events || [];
+  renderMissionControl();
+  await loadSessions();
+}
+
+function renderTaskBoard() {
+  if (!taskBoardEl) return;
+  taskBoardEl.innerHTML = "";
+  if (!currentTasks.length) {
+    taskBoardEl.innerHTML = '<div class="task-board-empty">Nenhuma tarefa ativa nesta sessão.</div>';
+    return;
+  }
+  [...currentTasks].slice().reverse().forEach((task) => {
+    const card = document.createElement("div");
+    card.className = `task-card ${task.status || "todo"}`;
+    card.innerHTML = `<strong>${escapeHtml(task.title || "Nova tarefa")}</strong><span>${escapeHtml(`${phaseLabel(task.phase)} · ${task.status || "todo"}`)}</span>${task.objective ? `<small>${escapeHtml(task.objective)}</small>` : ""}`;
+
+    const actions = document.createElement("div");
+    actions.className = "task-card-actions";
+
+    const start = document.createElement("button");
+    start.type = "button";
+    start.className = "secondary";
+    start.textContent = "Iniciar";
+    start.disabled = task.status === "in_progress";
+    start.addEventListener("click", async () => {
+      await updateSessionTask(task.id, { status: "in_progress" });
+    });
+
+    const next = document.createElement("button");
+    next.type = "button";
+    next.className = "secondary";
+    next.textContent = "Próxima fase";
+    next.disabled = phaseLabel(task.phase) === "memory";
+    next.addEventListener("click", async () => {
+      await updateSessionTask(task.id, { phase: nextTaskPhase(task.phase), status: task.status === "todo" ? "in_progress" : task.status });
+    });
+
+    const done = document.createElement("button");
+    done.type = "button";
+    done.className = "secondary";
+    done.textContent = "Concluir";
+    done.disabled = task.status === "done";
+    done.addEventListener("click", async () => {
+      await updateSessionTask(task.id, { status: "done", phase: phaseLabel(task.phase) === "memory" ? "memory" : "verifier" });
+    });
+
+    actions.append(start, next, done);
+    card.appendChild(actions);
+    taskBoardEl.appendChild(card);
+  });
+}
+
+function normalizeMissionPayload(mission = null) {
+  const payload = mission || {};
+  return {
+    objective: payload.objective || "",
+    status: payload.status || "idle",
+    next_steps: Array.isArray(payload.next_steps) ? payload.next_steps.filter((item) => String(item || "").trim()) : [],
+    updated_at: payload.updated_at || null,
+  };
+}
+
+function syncMissionInputs() {
+  const mission = normalizeMissionPayload(currentMission);
+  missionObjectiveInputEl.value = mission.objective || "";
+  missionStatusInputEl.value = mission.status || "idle";
+  missionNextStepsInputEl.value = mission.next_steps.join("\n");
+}
+
+async function persistMissionFromInputs() {
+  if (!currentSessionId) return;
+  const mission = normalizeMissionPayload({
+    objective: missionObjectiveInputEl.value.trim() || null,
+    status: missionStatusInputEl.value.trim() || "idle",
+    next_steps: missionNextStepsInputEl.value.split(/\n+/).map((item) => item.trim()).filter(Boolean),
+  });
+  const payload = await api(`/api/chat/sessions/${currentSessionId}`, {
+    method: "PUT",
+    body: JSON.stringify({ mission }),
+  });
+  currentMission = payload.session.mission || mission;
+  currentTasks = payload.session.tasks || currentTasks;
+  currentEvents = payload.session.events || currentEvents;
+  renderMissionControl();
+  await loadSessions();
+  await appendSessionOperation({
+    kind: "mission_update",
+    title: "Atualizou missão ativa",
+    detail: mission.objective || mission.status || "missão sem objetivo definido",
+  });
+  announceAssistantMessage("Missão persistida nesta sessão do Jarvis.");
+}
+
+function buildMissionModel() {
+  const active = getCurrentEditor();
+  const dirtyEditors = openEditors.filter((editor) => editor.dirty);
+  const hasTerminalOutput = Boolean(terminalBuffer.trim());
+  const hasGitContext = Boolean(latestGitContext.trim());
+  const pendingApprovals = currentApprovals.filter((item) => item.status === "pending");
+  const latestOperation = currentSessionOperations.length ? currentSessionOperations[currentSessionOperations.length - 1] : null;
+  const risks = [];
+  if (dirtyEditors.length) risks.push(`${dirtyEditors.length} arquivo(s) com alterações não salvas`);
+  if (pendingApprovals.length) risks.push(`${pendingApprovals.length} ação(ões) aguardando decisão`);
+  if (active && !hasTerminalOutput) risks.push("sem saída recente de terminal para validar a alteração atual");
+  if (!active) risks.push("nenhum arquivo ativo no editor");
+  const focus = active
+    ? `Trabalhando em ${active.path}`
+    : `Sem arquivo aberto no workspace ${workspaceInput.value.trim() || "jarvis"}`;
+  const mission = normalizeMissionPayload(currentMission);
+  const activeTasks = currentTasks.filter((task) => task.status !== "done");
+  return {
+    active,
+    dirtyEditors,
+    hasTerminalOutput,
+    hasGitContext,
+    pendingApprovals,
+    latestOperation,
+    focus,
+    risks,
+    mission,
+    activeTasks,
+  };
+}
+
+function buildMissionActions(model) {
+  const actions = [];
+  if (!model.active) {
+    actions.push({
+      label: "Abrir arquivo do workspace",
+      detail: "Escolha um arquivo para o Jarvis acompanhar",
+      run: async () => {
+        openPathButton.click();
+        setWorkbenchMode("build");
+      },
+    });
+  }
+  if (model.active && model.dirtyEditors.length) {
+    actions.push({
+      label: "Salvar abas pendentes",
+      detail: "Persistir mudanças antes de validar",
+      run: async () => {
+        await saveAllEditors();
+      },
+    });
+  }
+  if (model.active && !model.hasTerminalOutput) {
+    actions.push({
+      label: "Pedir plano de validação",
+      detail: "Jarvis sugere como testar a mudança atual",
+      run: async () => {
+        primePrompt(`Sou seu parceiro técnico. Para o arquivo ${model.active.path}, proponha o melhor plano curto de validação e o primeiro comando a executar.`, { mode: "build", activeFile: true, terminal: true });
+      },
+    });
+  }
+  if (model.pendingApprovals.length) {
+    actions.push({
+      label: "Entrar em modo review",
+      detail: "Revisar fila de ações pendentes do Jarvis",
+      run: async () => {
+        setWorkbenchMode("review");
+      },
+    });
+  }
+  if (model.active && model.hasTerminalOutput) {
+    actions.push({
+      label: "Diagnosticar saída atual",
+      detail: "Usar terminal e arquivo ativo para próxima decisão",
+      run: async () => {
+        preparePromptForTerminalDebug();
+      },
+    });
+  }
+  if (model.active && !model.hasGitContext) {
+    actions.push({
+      label: "Coletar contexto Git",
+      detail: "Carregar status/diff para revisão e PR",
+      run: async () => {
+        await loadGitContext("status");
+        setWorkbenchMode("review");
+      },
+    });
+  }
+  actions.push({
+    label: "Briefing completo",
+    detail: "Pedir ao Jarvis um resumo operacional e próxima ação",
+    run: async () => {
+      primePrompt(buildMissionPrompt(), { mode: "chat", activeFile: Boolean(model.active), terminal: true, search: true });
+    },
+  });
+  return actions.slice(0, 4);
+}
+
+function buildMissionBriefingText() {
+  const model = buildMissionModel();
+  const lines = [
+    `Missão: ${model.mission.objective || "não definida"}`,
+    `Status: ${model.mission.status || "idle"}`,
+    model.mission.next_steps.length ? `Próximos passos: ${model.mission.next_steps.join("; ")}` : "Próximos passos: nenhum registrado",
+    `Foco: ${model.focus}`,
+    model.latestOperation ? `Última operação: ${model.latestOperation.title || model.latestOperation.kind}` : "Última operação: nenhuma ainda",
+    model.risks.length ? `Alertas: ${model.risks.join("; ")}` : "Alertas: nenhum crítico no momento",
+  ];
+  return lines.join("\n");
+}
+
+function buildMissionPrompt() {
+  const model = buildMissionModel();
+  const lines = [
+    "Atue como meu parceiro virtual local no estilo Jarvis.",
+    "Faça um briefing curto, diga o estado atual, o maior risco e a próxima melhor ação.",
+    `Missão persistida: ${model.mission.objective || "não definida"}`,
+    `Status da missão: ${model.mission.status || "idle"}`,
+    model.mission.next_steps.length ? `Próximos passos registrados: ${model.mission.next_steps.join("; ")}` : "Próximos passos registrados: nenhum.",
+    `Foco atual: ${model.focus}`,
+    model.latestOperation ? `Última operação: ${model.latestOperation.title || model.latestOperation.kind}` : "Última operação: nenhuma",
+    model.risks.length ? `Alertas: ${model.risks.join('; ')}` : "Alertas: nenhum crítico.",
+  ];
+  return lines.join(" ");
+}
+
+function renderMissionControl() {
+  if (!missionStatusEl || !missionNextActionsEl) return;
+  const model = buildMissionModel();
+  syncMissionInputs();
+  const latestOperation = model.latestOperation?.title || model.latestOperation?.kind || "nenhuma";
+  const statusCards = [
+    { label: "Missão", value: model.mission.objective || "Nenhum objetivo persistido nesta sessão" },
+    { label: "Status", value: model.mission.status || "idle" },
+    { label: "Foco", value: model.focus },
+    { label: "Última ação", value: latestOperation },
+    { label: "Aprovações", value: model.pendingApprovals.length ? `${model.pendingApprovals.length} pendente(s)` : "fila limpa" },
+    { label: "Tarefas", value: model.activeTasks.length ? `${model.activeTasks.length} ativa(s)` : "sem tarefas ativas" },
+    { label: "Risco", value: model.risks[0] || "baixo no momento" },
+  ];
+  missionStatusEl.innerHTML = statusCards
+    .map((item) => `<div class="mission-card"><strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.value)}</span></div>`)
+    .join("");
+
+  const actions = buildMissionActions(model);
+  missionNextActionsEl.innerHTML = "";
+  actions.forEach((action) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "secondary mission-action";
+    button.innerHTML = `<strong>${escapeHtml(action.label)}</strong><span>${escapeHtml(action.detail)}</span>`;
+    button.addEventListener("click", async () => {
+      await action.run();
+      renderMissionControl();
+    });
+    missionNextActionsEl.appendChild(button);
+  });
+  renderTaskBoard();
+}
+
+function buildCommandPaletteItems() {
+  const active = getCurrentEditor();
+  const workspace = workspaceInput.value.trim() || "jarvis";
+  const items = [
+    { label: "Abrir arquivo", description: "Solicita um caminho e abre no editor", keywords: ["open", "arquivo", "editor"], action: async () => { openPathButton.click(); setWorkbenchMode("build"); } },
+    { label: "Criar arquivo", description: "Cria um arquivo e prepara o Jarvis para implementar", keywords: ["new", "criar", "file", "jarvis"], action: async () => { await preparePromptForCreateFile(); } },
+    { label: "Fluxo rápido: abrir/criar alvo", description: resolveQuickTargetPath() || "Usa o alvo do cockpit rápido", keywords: ["quick", "target", "codex", "arquivo"], action: async () => { await openQuickFlowTarget(); } },
+    { label: "Fluxo rápido: pedir ao Jarvis", description: "Gera prompt com intenção, alvo e objetivo atuais", keywords: ["quick", "prompt", "codex", "jarvis"], action: async () => { await runQuickFlowPrompt(); } },
+    { label: "Anexar terminal ao chat", description: "Leva a saída recente do bash para o próximo prompt", keywords: ["terminal", "attach", "bash", "chat"], action: async () => { await attachTerminalSnapshot(); } },
+    { label: "Explicar arquivo atual", description: active ? active.path : "Requer um arquivo aberto", keywords: ["explain", "arquivo", "analise"], action: async () => { preparePromptForActiveFile(); } },
+    { label: "Diagnosticar terminal", description: "Usa a saída recente do terminal como contexto", keywords: ["debug", "terminal", "bash"], action: async () => { await preparePromptForTerminalFix(); } },
+    { label: "Próximo passo sugerido", description: `Planejar próxima ação no workspace ${workspace}`, keywords: ["next", "step", "planner", "workspace"], action: async () => { preparePromptForNextStep(); } },
+    { label: "Modo Chat", description: "Foco em conversa com Jarvis", keywords: ["mode", "chat"], action: async () => { setWorkbenchMode("chat"); } },
+    { label: "Modo Build", description: "Foco em arquivos, edição e implementação", keywords: ["mode", "build", "editor"], action: async () => { setWorkbenchMode("build"); } },
+    { label: "Modo Review", description: "Foco em diffs, fila e revisão", keywords: ["mode", "review", "diff", "approval"], action: async () => { setWorkbenchMode("review"); } },
+    { label: "Modo Focus", description: "Esconde painéis para conversa concentrada", keywords: ["mode", "focus", "minimal"], action: async () => { setWorkbenchMode("focus"); } },
+    { label: "Novo terminal", description: "Abre uma nova sessão bash persistente", keywords: ["terminal", "bash", "new"], action: async () => { await createTerminalSession(); setWorkbenchMode("build"); } },
+    { label: "Terminal no diretório do arquivo", description: active ? active.path : "Requer um arquivo aberto", keywords: ["terminal", "file", "cwd"], action: async () => { await jumpTerminalToActiveFileDir(); setWorkbenchMode("build"); } },
+    { label: "Abrir terminal Linux nativo", description: "Lança um terminal externo do sistema", keywords: ["linux", "native", "terminal"], action: async () => { await openNativeLinuxTerminal(); } },
+    { label: "Anexar contexto Git", description: "Prepara status/diff/log para o próximo prompt", keywords: ["git", "attach", "context"], action: async () => { await attachGitContextToChat(); setWorkbenchMode("review"); } },
+    { label: "Salvar todas as abas", description: "Persiste todos os arquivos pendentes", keywords: ["save", "tabs", "files"], action: async () => { await saveAllEditors(); } },
+    { label: "Criar tarefa planner", description: "Abre uma nova tarefa no ciclo planner → executor → verifier → memory", keywords: ["task", "planner", "cycle"], action: async () => { taskPhaseEl.value = "planner"; taskTitleEl.focus(); setWorkbenchMode("chat"); } },
+    { label: "Anexar abas abertas", description: "Coloca as abas abertas no próximo prompt", keywords: ["attach", "tabs", "prompt"], action: async () => { await attachOpenTabsToChat(); } },
+  ];
+  if (active) {
+    items.unshift({ label: `Perguntar sobre ${active.path}`, description: "Prepara um prompt direto sobre o arquivo ativo", keywords: ["ask", active.path, "active"], action: async () => { primePrompt(`Analise ${active.path} como meu parceiro técnico. Explique o que está acontecendo e proponha a melhor próxima ação.`, { mode: "build", activeFile: true, terminal: true }); } });
+  }
+  return items;
+}
+
+function getFilteredCommandPaletteItems() {
+  const term = (commandPaletteInputEl.value || "").trim().toLowerCase();
+  const items = buildCommandPaletteItems();
+  if (!term) return items;
+  return items.filter((item) => [item.label, item.description || "", ...(item.keywords || [])].join(" ").toLowerCase().includes(term));
+}
+
+function openCommandPalette() {
+  commandPaletteOpen = true;
+  commandPaletteIndex = 0;
+  commandPaletteInputEl.value = "";
+  commandPaletteEl.classList.remove("hidden");
+  commandPaletteEl.setAttribute("aria-hidden", "false");
+  renderCommandPaletteResults();
+  window.setTimeout(() => {
+    commandPaletteInputEl.focus();
+    commandPaletteInputEl.select();
+  }, 0);
+}
+
+function closeCommandPalette() {
+  commandPaletteOpen = false;
+  commandPaletteEl.classList.add("hidden");
+  commandPaletteEl.setAttribute("aria-hidden", "true");
+  commandPaletteItems = [];
+  focusComposer();
+}
+
+function moveCommandPaletteSelection(delta) {
+  if (!commandPaletteItems.length) return;
+  commandPaletteIndex = (commandPaletteIndex + delta + commandPaletteItems.length) % commandPaletteItems.length;
+  renderCommandPaletteResults();
+}
+
+async function executeSelectedCommandPaletteItem() {
+  const item = commandPaletteItems[commandPaletteIndex];
+  if (!item) return;
+  closeCommandPalette();
+  await item.action();
+}
+
+function renderCommandPaletteResults() {
+  commandPaletteItems = getFilteredCommandPaletteItems();
+  if (!commandPaletteItems.length) {
+    commandPaletteResultsEl.innerHTML = '<div class="command-palette-empty">Nenhum comando encontrado.</div>';
+    return;
+  }
+  commandPaletteIndex = Math.min(commandPaletteIndex, commandPaletteItems.length - 1);
+  commandPaletteResultsEl.innerHTML = "";
+  commandPaletteItems.forEach((item, index) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "command-palette-item secondary";
+    if (index === commandPaletteIndex) button.classList.add("active");
+    button.innerHTML = `<strong>${escapeHtml(item.label)}</strong><span>${escapeHtml(item.description || "")}</span>`;
+    button.addEventListener("mousemove", () => {
+      if (commandPaletteIndex !== index) {
+        commandPaletteIndex = index;
+        renderCommandPaletteResults();
+      }
+    });
+    button.addEventListener("click", async () => {
+      commandPaletteIndex = index;
+      await executeSelectedCommandPaletteItem();
+    });
+    commandPaletteResultsEl.appendChild(button);
+  });
+}
+
+function loadWorkbenchMode() {
+  try {
+    const raw = localStorage.getItem(WORKBENCH_MODE_KEY);
+    if (raw) workbenchMode = raw;
+  } catch {
+    workbenchMode = "chat";
+  }
+}
+
+function setWorkbenchMode(mode, options = {}) {
+  const normalized = ["chat", "build", "review", "focus"].includes(mode) ? mode : "chat";
+  workbenchMode = normalized;
+  document.body.dataset.workbenchMode = normalized;
+  for (const button of workbenchModeButtons) {
+    button.classList.toggle("active", button.dataset.mode === normalized);
+  }
+  if (options.persist !== false) {
+    localStorage.setItem(WORKBENCH_MODE_KEY, normalized);
+  }
+  if (options.syncSession !== false) {
+    scheduleSessionUiStateSave();
+  }
+  renderWorkbenchStatus();
+}
+
+function focusComposer() {
+  promptEl.focus();
+  const end = promptEl.value.length;
+  promptEl.setSelectionRange(end, end);
+}
+
+function primePrompt(prompt, { mode = null, activeFile = false, terminal = false, search = false } = {}) {
+  if (activeFile) contextActiveFileCheckbox.checked = true;
+  if (terminal) contextTerminalCheckbox.checked = true;
+  if (search) contextSearchCheckbox.checked = true;
+  persistContextPrefs();
+  renderComposerContextPreview();
+  promptEl.value = prompt;
+  if (mode) setWorkbenchMode(mode);
+  focusComposer();
+}
+
+function preparePromptForActiveFile() {
+  const active = getCurrentEditor();
+  if (!active) {
+    announceAssistantMessage("Abra um arquivo antes de pedir análise do arquivo atual.");
+    return;
+  }
+  primePrompt(`Explique o arquivo ${active.path}, aponte riscos, gargalos e melhorias concretas.`, { mode: "build", activeFile: true });
+}
+
+function preparePromptForTerminalDebug() {
+  if (!terminalBuffer.trim()) {
+    announceAssistantMessage("Ainda não há saída recente no terminal para diagnosticar.");
+    return;
+  }
+  primePrompt("Analise a saída recente do terminal, identifique a causa raiz do problema e proponha a próxima ação objetiva.", { mode: "review", activeFile: Boolean(getCurrentEditor()), terminal: true });
+}
+
+async function preparePromptForCreateFile() {
+  const path = (window.prompt("Caminho do novo arquivo relativo ao workspace:", quickTargetPathEl?.value || currentOpenFilePath || "notes/tarefa.md") || "").trim();
+  if (!path) return;
+  const goal = (window.prompt("O que o Jarvis deve criar nesse arquivo?", quickGoalEl?.value || "Implemente a primeira versão com estrutura clara e comentários mínimos.") || "").trim();
+  if (quickTargetPathEl) quickTargetPathEl.value = path;
+  if (quickGoalEl && goal) quickGoalEl.value = goal;
+  await setQuickFlowMode("create");
+  await ensureWorkspaceFile(path);
+  await runQuickFlowPrompt();
+}
+
+function preparePromptForNextStep() {
+  const workspace = workspaceInput.value.trim() || "jarvis";
+  const active = getCurrentEditor();
+  const suffix = active ? ` Considere especialmente o arquivo ${active.path}.` : "";
+  primePrompt(`Com base no estado atual do workspace ${workspace}, proponha o próximo passo de maior impacto e menor risco.${suffix}`, { mode: "chat", activeFile: Boolean(active), terminal: true, search: true });
+}
+
+const QUICK_FLOW_CONFIG = {
+  create: {
+    label: "criar",
+    model: "jarvis-programador",
+    targetRequired: true,
+    defaultGoal: "criar uma primeira versão funcional com estrutura clara e manutenção simples",
+    placeholder: "Objetivo, ex: criar um chat lateral com streaming",
+    taskInstruction: (path, goal) => `Implemente o arquivo ${path}. Objetivo: ${goal}. Mantenha a solução simples e funcional.`,
+    prompt: (path, goal) => `Crie ou continue o arquivo ${path}. Objetivo: ${goal}. Entregue uma primeira versão funcional e explique o próximo passo.`,
+    context: { mode: "build", activeFile: true, terminal: true },
+  },
+  implement: {
+    label: "implementar",
+    model: "jarvis-programador",
+    targetRequired: true,
+    defaultGoal: "implementar a funcionalidade solicitada com validação objetiva",
+    placeholder: "Objetivo, ex: implementar o fluxo de aprovações no editor",
+    taskInstruction: (path, goal) => `No arquivo ${path}, implemente: ${goal}. Priorize clareza, baixo risco e código diretamente utilizável.`,
+    prompt: (path, goal) => `Implemente no arquivo ${path}: ${goal}. Proponha a melhor abordagem e a primeira alteração concreta.`,
+    context: { mode: "build", activeFile: true, terminal: true },
+  },
+  "fix-terminal": {
+    label: "corrigir erro",
+    model: "jarvis-programador",
+    targetRequired: false,
+    requiresTerminal: true,
+    defaultGoal: "diagnosticar a falha atual, explicar a causa raiz e sugerir a menor correção segura",
+    placeholder: "Objetivo, ex: entender por que o backend não sobe no VS Code",
+    taskInstruction: (path, goal) => `Use o terminal recente${path ? ` e o arquivo ${path}` : ""} para ${goal}. Se houver edição, proponha a menor correção segura.`,
+    prompt: (path, goal) => `Analise o terminal recente${path ? ` e o arquivo ${path}` : ""}. Objetivo: ${goal}. Diga a causa raiz e a próxima ação objetiva.`,
+    context: { mode: "review", activeFile: true, terminal: true },
+  },
+  review: {
+    label: "revisar",
+    model: "jarvis-programador",
+    targetRequired: false,
+    defaultGoal: "revisar o arquivo ativo, apontar riscos e sugerir melhorias concretas",
+    placeholder: "Objetivo, ex: revisar este arquivo como código de produção",
+    taskInstruction: (path, goal) => `Revise ${path || "o arquivo ativo"}. Objetivo: ${goal}. Priorize bugs, regressões e clareza.`,
+    prompt: (path, goal) => `Revise ${path || "o arquivo ativo"} com foco em bugs, riscos, gargalos e melhorias objetivas. Objetivo adicional: ${goal}.`,
+    context: { mode: "review", activeFile: true, terminal: true },
+  },
+  research: {
+    label: "pesquisar",
+    model: "jarvis-pesquisador",
+    targetRequired: false,
+    defaultGoal: "buscar contexto documental local e resumir o que é mais útil agora",
+    placeholder: "Objetivo, ex: procurar notas e documentos locais sobre Linux ou CrossFit",
+    taskInstruction: (path, goal) => `Pesquise o contexto local${path ? ` relacionado a ${path}` : ""}. Objetivo: ${goal}.`,
+    prompt: (path, goal) => `Pesquise a base local${path ? ` relacionada a ${path}` : ""}. Objetivo: ${goal}. Cite caminhos e próximos passos úteis.`,
+    context: { mode: "chat", activeFile: Boolean(getCurrentEditor()), terminal: false, search: true },
+  },
+};
+
+function loadQuickFlowMode() {
+  try {
+    const raw = localStorage.getItem(QUICK_FLOW_MODE_KEY);
+    if (raw && QUICK_FLOW_CONFIG[raw]) quickFlowMode = raw;
+  } catch {
+    quickFlowMode = "create";
+  }
+}
+
+async function setPreferredModel(model) {
+  if (!model || modelSelect.value === model) return;
+  modelSelect.value = model;
+  if (currentSessionId) {
+    await api(`/api/chat/sessions/${currentSessionId}`, {
+      method: "PUT",
+      body: JSON.stringify({ model }),
+    });
+    await loadSessions();
+  }
+}
+
+function normalizeQuickFlowMode(mode) {
+  return QUICK_FLOW_CONFIG[mode] ? mode : "create";
+}
+
+function resolveQuickFlowConfig(mode = quickFlowMode) {
+  return QUICK_FLOW_CONFIG[normalizeQuickFlowMode(mode)];
+}
+
+function resolveQuickTargetPath() {
+  return (quickTargetPathEl?.value || currentOpenFilePath || "").trim();
+}
+
+function resolveQuickGoal(mode = quickFlowMode) {
+  const config = resolveQuickFlowConfig(mode);
+  const goal = (quickGoalEl?.value || "").trim();
+  return goal || config.defaultGoal;
+}
+
+function syncQuickFlowUi() {
+  const config = resolveQuickFlowConfig();
+  if (quickGoalEl) quickGoalEl.placeholder = config.placeholder;
+  quickFlowButtons.forEach((button) => {
+    button.classList.toggle("active", (button.dataset.quickFlow || "") === quickFlowMode);
+  });
+  renderComposerContextPreview();
+  scheduleSessionUiStateSave();
+}
+
+async function setQuickFlowMode(mode, options = {}) {
+  quickFlowMode = normalizeQuickFlowMode(mode);
+  if (options.persist !== false) {
+    localStorage.setItem(QUICK_FLOW_MODE_KEY, quickFlowMode);
+  }
+  const config = resolveQuickFlowConfig();
+  if (quickGoalEl && !quickGoalEl.value.trim()) {
+    quickGoalEl.value = config.defaultGoal;
+  }
+  await setPreferredModel(config.model);
+  syncQuickFlowUi();
+}
+
+async function ensureWorkspaceFile(path) {
+  const normalizedPath = String(path || "").trim();
+  if (!normalizedPath) return null;
+  try {
+    await api(`/api/workspace/file?session_id=${encodeURIComponent(currentSessionId || "")}`, {
+      method: "POST",
+      body: JSON.stringify({ path: normalizedPath, content: "" }),
+    });
+    await appendSessionOperation({ kind: "quick_file_create", title: `Fluxo rápido criou ${normalizedPath}`, path: normalizedPath, detail: "arquivo preparado para o Jarvis" });
+  } catch {
+    // file may already exist
+  }
+  await loadWorkspaceTree();
+  await openWorkspaceFile(normalizedPath);
+  return normalizedPath;
+}
+
+function getRecentTerminalExcerpt(limit = 6000) {
+  const text = String(terminalBuffer || "").trim();
+  if (!text) return "";
+  return text.length > limit ? text.slice(-limit) : text;
+}
+
+async function attachTerminalSnapshot(options = {}) {
+  const excerpt = getRecentTerminalExcerpt(options.limit || 6000);
+  if (!excerpt) {
+    if (options.announce !== false) announceAssistantMessage("Ainda não há saída recente no terminal para anexar.");
+    return false;
+  }
+  pendingAttachments.push({
+    id: `terminal-context-${Date.now()}`,
+    name: options.name || "terminal-context.txt",
+    content: excerpt,
+    size: new Blob([excerpt]).size,
+  });
+  renderAttachments();
+  await appendSessionOperation({
+    kind: "terminal_attach",
+    title: "Anexou saída recente do terminal",
+    command: commandHistory[0] || null,
+    path: getCurrentEditor()?.path || null,
+    detail: `${excerpt.length} chars prontos para o próximo prompt`,
+  });
+  if (options.announce !== false) announceAssistantMessage("Saída recente do terminal anexada ao próximo prompt.");
+  return true;
+}
+
+async function openQuickFlowTarget() {
+  const config = resolveQuickFlowConfig();
+  const path = resolveQuickTargetPath();
+  if (config.targetRequired && !path) {
+    announceAssistantMessage("Defina um caminho no fluxo rápido antes de abrir ou criar o alvo.");
+    return;
+  }
+  if (!path) {
+    const active = getCurrentEditor();
+    if (active) {
+      setWorkbenchMode("build");
+      announceAssistantMessage(`Usando o arquivo ativo ${active.path} como alvo do fluxo rápido.`);
+      return;
+    }
+    announceAssistantMessage("Abra um arquivo ou informe um alvo no fluxo rápido.");
+    return;
+  }
+  await ensureWorkspaceFile(path);
+  setWorkbenchMode("build");
+  announceAssistantMessage(`Alvo pronto no editor: ${path}`);
+}
+
+function buildQuickFlowPrompt(mode = quickFlowMode) {
+  const config = resolveQuickFlowConfig(mode);
+  const target = resolveQuickTargetPath() || getCurrentEditor()?.path || "o contexto atual";
+  const goal = resolveQuickGoal(mode);
+  return config.prompt(target, goal);
+}
+
+async function runQuickFlowPrompt() {
+  const config = resolveQuickFlowConfig();
+  const target = resolveQuickTargetPath();
+  if (config.requiresTerminal && !getRecentTerminalExcerpt()) {
+    announceAssistantMessage("Execute algo no terminal antes de usar o fluxo de correção por terminal.");
+    return;
+  }
+  if (config.targetRequired && target) {
+    await ensureWorkspaceFile(target);
+  }
+  if (config.targetRequired && !target && !getCurrentEditor()) {
+    announceAssistantMessage("Defina um alvo no workspace ou abra um arquivo antes de pedir implementação.");
+    return;
+  }
+  await setPreferredModel(config.model);
+  if (config.requiresTerminal) {
+    await attachTerminalSnapshot({ announce: false });
+  }
+  primePrompt(buildQuickFlowPrompt(), config.context);
+}
+
+async function stageQuickFlowInEditor() {
+  const config = resolveQuickFlowConfig();
+  const target = resolveQuickTargetPath();
+  if (config.targetRequired && target) {
+    await ensureWorkspaceFile(target);
+  }
+  const active = getCurrentEditor();
+  if (!active) {
+    announceAssistantMessage("Abra ou crie um arquivo antes de levar o fluxo rápido para o editor.");
+    return;
+  }
+  if (config.requiresTerminal && !getRecentTerminalExcerpt()) {
+    announceAssistantMessage("Ainda não há saída recente no terminal para transformar em tarefa do editor.");
+    return;
+  }
+  editorInstructionEl.value = config.taskInstruction(active.path, resolveQuickGoal());
+  if (config.requiresTerminal) {
+    await attachTerminalSnapshot({ announce: false });
+  }
+  setWorkbenchMode("build");
+  editorInstructionEl.focus();
+  announceAssistantMessage(`Fluxo ${config.label} preparado no editor para ${active.path}. Use 'Jarvis executar' quando quiser.`);
+}
+
+async function preparePromptForTerminalFix() {
+  const excerpt = getRecentTerminalExcerpt();
+  if (!excerpt) {
+    announceAssistantMessage("Ainda não há saída recente no terminal para diagnosticar.");
+    return;
+  }
+  await setQuickFlowMode("fix-terminal");
+  await attachTerminalSnapshot({ announce: false });
+  primePrompt(buildQuickFlowPrompt("fix-terminal"), { mode: "review", activeFile: Boolean(getCurrentEditor()), terminal: true });
+}
+
+async function createTerminalFollowupTask() {
+  if (!currentSessionId) return;
+  const excerpt = getRecentTerminalExcerpt(400);
+  if (!excerpt) {
+    announceAssistantMessage("Ainda não há saída recente no terminal para virar tarefa.");
+    return;
+  }
+  const firstLine = excerpt.split("\n").map((line) => line.trim()).find(Boolean) || "diagnosticar terminal local";
+  const title = `Diagnosticar terminal: ${firstLine.slice(0, 72)}`;
+  const payload = await api(`/api/chat/sessions/${currentSessionId}/tasks`, {
+    method: "POST",
+    body: JSON.stringify({
+      title,
+      objective: resolveQuickGoal("fix-terminal"),
+      phase: "planner",
+      status: "todo",
+      workspace: workspaceInput.value.trim() || null,
+    }),
+  });
+  currentTasks = payload.session.tasks || [];
+  currentEvents = payload.session.events || [];
+  renderMissionControl();
+  await loadSessions();
+  announceAssistantMessage("Saída recente do terminal convertida em tarefa do ciclo planner → executor → verifier → memory.");
+}
+
+function renderWorkbenchStatus() {
+  if (!workbenchStatusEl) return;
+  const active = getCurrentEditor();
+  const dirtyCount = openEditors.filter((editor) => editor.dirty).length;
+  const partnerHint = active ? `Jarvis acompanhando ${active.path}` : "Jarvis em escuta";
+  const parts = [
+    partnerHint,
+    `modo ${workbenchMode}`,
+    `perfil ${modelSelect.value || "jarvis-safe"}`,
+    `sessão ${currentSessionId ? currentSessionId.slice(0, 6) : "nova"}`,
+    `workspace ${workspaceInput.value.trim() || "none"}`,
+    active ? `arquivo ${active.path}` : "sem arquivo",
+    dirtyCount ? `${dirtyCount} aba(s) pendente(s)` : "abas salvas",
+    terminalSessionId ? `terminal ${terminalSessionId.slice(0, 6)}` : "sem terminal",
+  ];
+  workbenchStatusEl.innerHTML = parts
+    .filter(Boolean)
+    .map((part) => `<span class="status-pill">${escapeHtml(part)}</span>`)
+    .join("");
 }
 
 function persistCurrentSessionId() {
@@ -1102,15 +2583,120 @@ function persistObsidianPrefs() {
   localStorage.setItem(OBSIDIAN_PREFS_KEY, JSON.stringify(prefs));
 }
 
-function renderMessages() {
-  messagesEl.innerHTML = "";
-  if (!messages.length) {
-    appendMessageElement("assistant", "Jarvis pronto. Escolha um perfil e envie sua mensagem.");
+function clearReplayTimer() {
+  if (replayTimer) {
+    window.clearInterval(replayTimer);
+    replayTimer = null;
+  }
+}
+
+function renderReplayStatus() {
+  if (!replayMode) {
+    replayStatusEl.textContent = "Replay inativo.";
+    replayToggleButton.textContent = "Pausar";
     return;
   }
-  for (const message of messages) {
-    appendMessageElement(message.role, message.display_content || message.content);
+  replayStatusEl.textContent = `Replay ${Math.min(replayIndex, replaySourceMessages.length)}/${replaySourceMessages.length} · ${replayPlaying ? "rodando" : "pausado"} · origem: ${replayOriginLabel}`;
+  replayToggleButton.textContent = replayPlaying ? "Pausar" : "Continuar";
+}
+
+function stopSessionReplay(options = {}) {
+  clearReplayTimer();
+  replayMode = false;
+  replayPlaying = false;
+  replayIndex = 0;
+  replayStartOffset = 0;
+  replayOriginLabel = "sessão inteira";
+  replaySourceMessages = [];
+  renderReplayStatus();
+  if (options.render !== false) {
+    renderMessages();
   }
+}
+
+function replayNextMessage() {
+  if (!replayMode) return;
+  if (replayIndex >= replaySourceMessages.length) {
+    replayPlaying = false;
+    clearReplayTimer();
+    renderReplayStatus();
+    return;
+  }
+  replayIndex += 1;
+  renderReplayStatus();
+  renderMessages();
+  if (replayIndex >= replaySourceMessages.length) {
+    replayPlaying = false;
+    clearReplayTimer();
+    renderReplayStatus();
+  }
+}
+
+function startReplayTimer() {
+  clearReplayTimer();
+  replayPlaying = true;
+  renderReplayStatus();
+  replayTimer = window.setInterval(() => {
+    replayNextMessage();
+  }, 700);
+}
+
+function toggleReplayPlayback() {
+  if (!replayMode) return;
+  if (replayPlaying) {
+    replayPlaying = false;
+    clearReplayTimer();
+    renderReplayStatus();
+    return;
+  }
+  startReplayTimer();
+}
+
+function startSessionReplay(options = {}) {
+  if (!messages.length) {
+    announceAssistantMessage("Nenhuma mensagem salva para reproduzir nesta sessão.");
+    return;
+  }
+  const fromIndex = Math.max(0, Number(options.fromIndex || 0));
+  const sourceMessages = messages.slice(fromIndex);
+  if (!sourceMessages.length) {
+    announceAssistantMessage("Não há mensagens suficientes a partir desse checkpoint para reproduzir.");
+    return;
+  }
+  clearReplayTimer();
+  replayMode = true;
+  replayPlaying = false;
+  replayIndex = 0;
+  replayStartOffset = fromIndex;
+  replayOriginLabel = options.label || (fromIndex > 0 ? `mensagem ${fromIndex}` : "sessão inteira");
+  replaySourceMessages = sourceMessages.map((message) => ({ ...message }));
+  renderReplayStatus();
+  renderMessages();
+  startReplayTimer();
+}
+
+function renderMessages() {
+  messagesEl.innerHTML = "";
+  const sourceMessages = replayMode ? replaySourceMessages.slice(0, replayIndex) : messages;
+  if (!sourceMessages.length) {
+    appendMessageElement("assistant", replayMode ? "Replay iniciado. Aguardando primeira mensagem..." : "Jarvis pronto. Escolha um perfil e envie sua mensagem.");
+    renderWorkbenchStatus();
+    return;
+  }
+  for (const message of sourceMessages) {
+    appendMessageElement(message.role, message.display_content || message.content, message.metadata || null, message.attachments || []);
+  }
+  renderWorkbenchStatus();
+}
+
+function formatMessageMetadata(metadata) {
+  if (!metadata || typeof metadata !== "object") return "";
+  const parts = [];
+  if (metadata.effective_agent) parts.push(`agente: ${metadata.effective_agent}`);
+  if (metadata.route_kind) parts.push(`rota: ${metadata.route_kind}`);
+  if (metadata.primary_model) parts.push(`modelo: ${metadata.primary_model}`);
+  if (metadata.workspace) parts.push(`workspace: ${metadata.workspace}`);
+  return parts.join(" | ");
 }
 
 function renderAttachments() {
@@ -1135,6 +2721,7 @@ function renderAttachments() {
     attachmentsEl.appendChild(chip);
   }
   renderComposerContextPreview();
+  renderWorkbenchStatus();
 }
 
 async function loadWorkspaceTree() {
@@ -1163,10 +2750,11 @@ async function loadTerminalSessions() {
     terminalBuffer = "";
   }
   renderTerminalSessions();
+  renderWorkbenchStatus();
 }
 
 async function createTerminalSession() {
-  const payload = await api("/api/terminal/sessions", {
+  const payload = await api(`/api/terminal/sessions?session_id=${encodeURIComponent(currentSessionId || "")}`, {
     method: "POST",
     body: JSON.stringify({
       cwd: terminalCwdEl.value.trim() || null,
@@ -1304,7 +2892,7 @@ async function pollTerminalOutputOnce(waitMs = 0) {
 
 async function sendTerminalData(data) {
   if (!terminalSessionId) return;
-  const payload = await api(`/api/terminal/sessions/${terminalSessionId}/write`, {
+  const payload = await api(`/api/terminal/sessions/${terminalSessionId}/write?chat_session_id=${encodeURIComponent(currentSessionId || "")}`, {
     method: "POST",
     body: JSON.stringify({ data, wait_ms: 60 }),
   });
@@ -1403,6 +2991,7 @@ function renderEditorTabs() {
     tab.appendChild(closeButton);
     editorTabsEl.appendChild(tab);
   }
+  renderWorkbenchStatus();
 }
 
 function getCurrentEditor() {
@@ -1412,6 +3001,7 @@ function getCurrentEditor() {
 function announceAssistantMessage(content) {
   messages.push({ role: "assistant", content, transient: true });
   renderMessages();
+  scheduleSessionUiStateSave();
 }
 
 function loadRecentFiles() {
@@ -1463,7 +3053,7 @@ async function saveAllEditors() {
     return;
   }
   for (const editor of dirtyEditors) {
-    await api("/api/workspace/file", {
+    await api(`/api/workspace/file?session_id=${encodeURIComponent(currentSessionId || "")}`, {
       method: "PUT",
       body: JSON.stringify({ path: editor.path, content: editor.content }),
     });
@@ -1503,6 +3093,7 @@ async function attachOpenTabsToChat() {
     detail: `${created.length} arquivo(s) anexado(s)`,
   });
   announceAssistantMessage(`${created.length} aba(s) anexada(s) ao próximo prompt.`);
+  scheduleSessionUiStateSave();
 }
 
 async function runEditorSelectionInTerminal() {
@@ -1528,6 +3119,7 @@ async function runEditorSelectionInTerminal() {
     detail: `range ${editorSelection.start}-${editorSelection.end}`,
   });
   announceAssistantMessage("Seleção enviada ao terminal.");
+  scheduleSessionUiStateSave();
 }
 
 function trackRecentFile(path) {
@@ -1594,6 +3186,10 @@ function buildGitCommand(mode) {
       return "git log --oneline -5";
     case "github":
       return "command -v gh >/dev/null 2>&1 && (gh repo view --json nameWithOwner,url,defaultBranchRef 2>/dev/null || gh auth status 2>/dev/null) || echo 'GitHub CLI nao disponivel no sistema.'";
+    case "prs":
+      return "command -v gh >/dev/null 2>&1 && gh pr list --limit 5 || echo 'GitHub CLI nao disponivel no sistema.'";
+    case "issues":
+      return "command -v gh >/dev/null 2>&1 && gh issue list --limit 5 || echo 'GitHub CLI nao disponivel no sistema.'";
     default:
       return "";
   }
@@ -1609,6 +3205,10 @@ function buildGitLabel(mode) {
       return "log";
     case "github":
       return "github";
+    case "prs":
+      return "prs";
+    case "issues":
+      return "issues";
     default:
       return "git";
   }
@@ -1617,7 +3217,7 @@ function buildGitLabel(mode) {
 async function runGitCommand(mode) {
   const command = buildGitCommand(mode);
   if (!command) return "";
-  const payload = await api("/api/terminal/run", {
+  const payload = await api(`/api/terminal/run?session_id=${encodeURIComponent(currentSessionId || "")}`, {
     method: "POST",
     body: JSON.stringify({
       command,
@@ -1660,6 +3260,107 @@ async function loadGitContext(mode) {
   }
 }
 
+function readGitHubTarget(promptLabel, fallback = "") {
+  const inline = (githubTargetInput?.value || "").trim();
+  if (inline) return inline;
+  return (window.prompt(promptLabel, fallback) || "").trim();
+}
+
+function readGitHubTitle(promptLabel, fallback = "") {
+  const inline = (githubTitleInput?.value || "").trim();
+  if (inline) return inline;
+  return (window.prompt(promptLabel, fallback) || "").trim();
+}
+
+function buildGitHubBody(title) {
+  const active = getCurrentEditor();
+  const parts = [
+    `Contexto gerado pelo Jarvis: ${title}`,
+  ];
+  if (active) {
+    parts.push(`Arquivo ativo: ${active.path}`);
+    parts.push("");
+    parts.push("Trecho do arquivo ativo:");
+    parts.push(truncateContext(active.content, 1500));
+  }
+  if (terminalBuffer.trim()) {
+    parts.push("");
+    parts.push("Terminal recente:");
+    parts.push(truncateContext(terminalBuffer, 1500));
+  }
+  if (latestGitContext.trim()) {
+    parts.push("");
+    parts.push("Contexto Git:");
+    parts.push(truncateContext(latestGitContext, 1500));
+  }
+  return parts.join("\n");
+}
+
+async function queueGitHubApproval(command, title, detail) {
+  await queueApproval({
+    kind: "terminal_command",
+    title,
+    command,
+    detail,
+    path: getCurrentEditor()?.path || null,
+    payload: { command, cwd: "." },
+  });
+  await appendSessionOperation({
+    kind: "github_queue_command",
+    title,
+    command,
+    detail,
+    path: getCurrentEditor()?.path || null,
+  });
+}
+
+async function promptGitHubAction(mode) {
+  let value = "";
+  if (mode === "pr-view") {
+    value = readGitHubTarget("Número da PR para visualizar:", "1");
+    if (!value.trim()) return;
+    await queueGitHubApproval(`gh pr view ${value.trim()} --comments`, `Visualizar PR #${value.trim()}`, "ação GitHub via gh enfileirada");
+    announceAssistantMessage(`PR #${value.trim()} enviada para a fila do Jarvis.`);
+    return;
+  }
+  if (mode === "pr-checkout") {
+    value = readGitHubTarget("Número da PR para checkout:", "1");
+    if (!value.trim()) return;
+    await queueGitHubApproval(`gh pr checkout ${value.trim()}`, `Checkout da PR #${value.trim()}`, "ação GitHub via gh enfileirada");
+    announceAssistantMessage(`Checkout da PR #${value.trim()} enviado para a fila do Jarvis.`);
+    return;
+  }
+  if (mode === "issue-view") {
+    value = readGitHubTarget("Número da issue para visualizar:", "1");
+    if (!value.trim()) return;
+    await queueGitHubApproval(`gh issue view ${value.trim()} --comments`, `Visualizar issue #${value.trim()}`, "ação GitHub via gh enfileirada");
+    announceAssistantMessage(`Issue #${value.trim()} enviada para a fila do Jarvis.`);
+    return;
+  }
+  if (mode === "pr-diff") {
+    value = readGitHubTarget("Número da PR para diff:", "1");
+    if (!value.trim()) return;
+    await queueGitHubApproval(`gh pr diff ${value.trim()}`, `Diff da PR #${value.trim()}`, "ação GitHub via gh enfileirada");
+    announceAssistantMessage(`Diff da PR #${value.trim()} enviado para a fila do Jarvis.`);
+    return;
+  }
+  if (mode === "pr-create") {
+    value = readGitHubTitle("Título da PR para criar:", "melhorar fluxo do jarvis");
+    if (!value.trim()) return;
+    const body = buildGitHubBody(value.trim());
+    await queueGitHubApproval(`gh pr create --title ${JSON.stringify(value.trim())} --body ${JSON.stringify(body)}`, `Criar PR: ${value.trim()}`, "ação GitHub via gh enfileirada");
+    announceAssistantMessage("Criação da PR enviada para a fila do Jarvis.");
+    return;
+  }
+  if (mode === "issue-create") {
+    value = readGitHubTitle("Título da issue para criar:", "corrigir lentidao do chat");
+    if (!value.trim()) return;
+    const body = buildGitHubBody(value.trim());
+    await queueGitHubApproval(`gh issue create --title ${JSON.stringify(value.trim())} --body ${JSON.stringify(body)}`, `Criar issue: ${value.trim()}`, "ação GitHub via gh enfileirada");
+    announceAssistantMessage(`Criação da issue enviada para a fila do Jarvis.`);
+  }
+}
+
 async function attachGitContextToChat() {
   if (!latestGitContext.trim()) {
     await loadGitContext("status");
@@ -1682,6 +3383,7 @@ async function attachGitContextToChat() {
     path: getCurrentEditor()?.path || null,
   });
   announceAssistantMessage("Contexto Git anexado ao proximo prompt.");
+  scheduleSessionUiStateSave();
 }
 
 function renderApprovals() {
@@ -1700,8 +3402,7 @@ function renderApprovals() {
 
     const meta = document.createElement("div");
     meta.className = "approval-card-meta";
-    meta.textContent = [approval.path, approval.command, approval.created_at].filter(Boolean).join("
-");
+    meta.textContent = [approval.path, approval.command, approval.created_at].filter(Boolean).join("\n");
 
     const preview = document.createElement("pre");
     preview.className = "approval-card-preview";
@@ -1737,16 +3438,14 @@ function renderApprovals() {
 function buildApprovalPreview(approval) {
   const payload = approval.payload || {};
   if (approval.kind === "terminal_command") {
-    return [`$ ${approval.command || payload.command || ""}`, approval.detail || ""].filter(Boolean).join("
-");
+    return [`$ ${approval.command || payload.command || ""}`, approval.detail || ""].filter(Boolean).join("\n");
   }
   if (approval.kind === "file_edit") {
     return payload.diff || payload.proposed_content || approval.detail || "[sem diff]";
   }
   if (approval.kind === "batch_edit") {
     const files = Array.isArray(payload.files) ? payload.files : [];
-    return [approval.detail || "Lote de arquivos", ...files.map((item) => item.path || "[arquivo]")].join("
-");
+    return [approval.detail || "Lote de arquivos", ...files.map((item) => item.path || "[arquivo]")].join("\n");
   }
   return approval.detail || JSON.stringify(payload, null, 2);
 }
@@ -1968,7 +3667,7 @@ function syncEditorFromState() {
   renderComposerContextPreview();
 }
 
-function closeEditor(path) {
+function closeEditor(path, options = {}) {
   const target = openEditors.find((editor) => editor.path === path);
   if (target?.dirty && !window.confirm(`Fechar ${path} sem salvar?`)) {
     return;
@@ -1989,12 +3688,15 @@ function closeEditor(path) {
   renderEditorTabs();
   syncEditorFromState();
   renderWorkspaceTree();
+  if (options.persist !== false) {
+    scheduleSessionUiStateSave();
+  }
 }
 
 async function saveCurrentEditor() {
   const active = getCurrentEditor();
   if (!active) return;
-  await api("/api/workspace/file", {
+  await api(`/api/workspace/file?session_id=${encodeURIComponent(currentSessionId || "")}`, {
     method: "PUT",
     body: JSON.stringify({ path: active.path, content: active.content }),
   });
@@ -2350,7 +4052,7 @@ function renderWorkspaceNode(node, container, depth) {
   container.appendChild(group);
 }
 
-async function openWorkspaceFile(path) {
+async function openWorkspaceFile(path, options = {}) {
   const payload = await api(`/api/workspace/file?path=${encodeURIComponent(path)}`);
   const existing = openEditors.find((editor) => editor.path === payload.path);
   if (existing) {
@@ -2370,6 +4072,9 @@ async function openWorkspaceFile(path) {
   renderEditorTabs();
   renderWorkspaceTree();
   renderComposerContextPreview();
+  if (options.persist !== false) {
+    scheduleSessionUiStateSave();
+  }
 }
 
 async function queueAttachments(files) {
@@ -2385,11 +4090,35 @@ async function queueAttachments(files) {
   renderComposerContextPreview();
 }
 
-function appendMessageElement(role, content) {
+function appendMessageElement(role, content, metadata = null, attachments = []) {
   const node = template.content.firstElementChild.cloneNode(true);
   node.classList.add(role === "user" ? "user" : "assistant");
   node.querySelector(".message-role").textContent = role === "user" ? "Você" : "Jarvis";
+  const metaEl = node.querySelector(".message-meta");
+  const metaLine = formatMessageMetadata(metadata);
+  if (metaLine) {
+    metaEl.textContent = metaLine;
+  } else {
+    metaEl.remove();
+  }
   node.querySelector(".message-body").textContent = content;
+  const renderedAttachments = Array.isArray(attachments) ? attachments.filter((attachment) => attachment && attachment.name) : [];
+  if (renderedAttachments.length) {
+    const attachmentsEl = document.createElement("div");
+    attachmentsEl.className = "message-attachments";
+    for (const attachment of renderedAttachments) {
+      const details = document.createElement("details");
+      details.className = "message-attachment";
+      const summary = document.createElement("summary");
+      summary.textContent = `${attachment.name} (${formatSize(Number(attachment.size) || String(attachment.content || "").length)})`;
+      const preview = document.createElement("pre");
+      preview.className = "message-attachment-preview";
+      preview.textContent = truncateContext(String(attachment.content || ""), 2000);
+      details.append(summary, preview);
+      attachmentsEl.appendChild(details);
+    }
+    node.appendChild(attachmentsEl);
+  }
   messagesEl.appendChild(node);
   messagesEl.scrollTop = messagesEl.scrollHeight;
   return node;
@@ -2429,11 +4158,12 @@ async function api(path, options = {}) {
   return response.json();
 }
 
-async function streamSessionMessage({ sessionId, model, content, displayContent, workspace }) {
+async function streamSessionMessage({ sessionId, model, content, displayContent, workspace, attachments = [] }) {
   const userMessage = {
     role: "user",
     content,
     display_content: displayContent,
+    attachments,
   };
   messages.push(userMessage);
   const assistantMessage = {
@@ -2445,6 +4175,7 @@ async function streamSessionMessage({ sessionId, model, content, displayContent,
 
   const assistantNode = messagesEl.lastElementChild;
   const assistantBody = assistantNode?.querySelector(".message-body");
+  const assistantMeta = assistantNode?.querySelector(".message-meta");
 
   const response = await fetch(`/api/chat/sessions/${sessionId}/message/stream`, {
     method: "POST",
@@ -2457,6 +4188,7 @@ async function streamSessionMessage({ sessionId, model, content, displayContent,
       content,
       display_content: displayContent,
       workspace,
+      attachments,
     }),
   });
   if (!response.ok || !response.body) {
@@ -2481,6 +4213,11 @@ async function streamSessionMessage({ sessionId, model, content, displayContent,
       if (payloadText === "[DONE]") continue;
       const payload = JSON.parse(payloadText);
       if (payload.type === "start") {
+        assistantMessage.metadata = payload.assistant_metadata || null;
+        if (assistantMeta) {
+          const metaLine = formatMessageMetadata(assistantMessage.metadata);
+          if (metaLine) assistantMeta.textContent = metaLine;
+        }
         continue;
       } else if (payload.type === "chunk") {
         assistantMessage.content += payload.delta || "";
@@ -2611,10 +4348,17 @@ function renderComposerContextPreview() {
   if (latestGitContext.trim()) {
     activeParts.push("git: pronto");
   }
+  if (quickFlowMode) {
+    activeParts.push(`fluxo: ${quickFlowMode}`);
+  }
+  if (resolveQuickTargetPath()) {
+    activeParts.push(`alvo: ${resolveQuickTargetPath()}`);
+  }
 
   const block = buildOperationalContextBlock();
   if (!activeParts.length) {
     composerContextPreviewEl.textContent = "Contexto automático desativado.";
+    renderWorkbenchStatus();
     return;
   }
 
@@ -2623,6 +4367,32 @@ function renderComposerContextPreview() {
     preview.push("", truncateContext(block, 900));
   }
   composerContextPreviewEl.textContent = preview.join("\n");
+  renderWorkbenchStatus();
+}
+
+async function openNativeLinuxTerminal(cwd = null) {
+  const payload = await api("/api/terminal/native", {
+    method: "POST",
+    body: JSON.stringify({ cwd }),
+  });
+  const result = payload.result || {};
+  await appendSessionOperation({
+    kind: "native_terminal_open",
+    title: "Abriu terminal Linux nativo",
+    detail: `${result.launcher || "launcher"} em ${result.cwd || cwd || "."}`,
+    path: getCurrentEditor()?.path || null,
+  });
+  announceAssistantMessage(`Terminal Linux nativo aberto com ${result.launcher || "launcher"} em ${result.cwd || cwd || "."}.`);
+}
+
+async function openNativeLinuxTerminalForActiveFile() {
+  const active = getCurrentEditor();
+  if (!active) {
+    announceAssistantMessage("Abra um arquivo antes de pedir o terminal Linux no diretório ativo.");
+    return;
+  }
+  const cwd = active.path.includes("/") ? active.path.slice(0, active.path.lastIndexOf("/")) : ".";
+  await openNativeLinuxTerminal(cwd);
 }
 
 async function runTerminalCommandFromInput() {
@@ -2639,6 +4409,7 @@ async function runTerminalCommandFromInput() {
     detail: "comando executado pelo launcher do terminal",
   });
   terminalCommandEl.select();
+  scheduleSessionUiStateSave();
 }
 
 async function sendTerminalCommandFromInput() {
@@ -2654,6 +4425,7 @@ async function sendTerminalCommandFromInput() {
     detail: "texto enviado ao shell sem Enter automático",
   });
   terminalCommandEl.focus();
+  scheduleSessionUiStateSave();
 }
 
 async function jumpTerminalToActiveFileDir() {
@@ -2798,7 +4570,23 @@ function buildHelpGuide() {
     "/git-status -> coleta status resumido do repositório",
     "/git-diff -> coleta diff atual para revisar mudanças",
     "/git-log -> coleta histórico recente do repositório",
+    "/git-prs -> lista pull requests locais via gh",
+    "/git-issues -> lista issues locais via gh",
+    "/gh-pr-view <n> -> enfileira visualização detalhada da PR no Jarvis",
+    "/gh-pr-checkout <n> -> enfileira checkout da PR no Jarvis",
+    "/gh-pr-diff <n> -> enfileira diff da PR no Jarvis",
+    "/gh-pr-create <titulo> -> enfileira criação de PR via gh",
+    "/gh-issue-view <n> -> enfileira visualização detalhada da issue no Jarvis",
+    "/gh-issue-create <titulo> -> enfileira criação de issue via gh",
+    "/linux-terminal -> abre um terminal Linux nativo no workspace",
+    "/mode <chat|build|review|focus> -> alterna o modo principal da interface",
+    "/explain-file -> prepara o prompt para analisar o arquivo ativo",
+    "/debug-terminal -> prepara o prompt para diagnosticar a saída recente do terminal",
+    "/linux-terminal-file -> abre um terminal Linux no diretório do arquivo ativo",
     "/git-attach -> anexa o último contexto Git ao próximo prompt",
+    "/attach-terminal -> anexa a saída recente do terminal ao próximo prompt",
+    "/fix-terminal -> prepara o Jarvis para diagnosticar o erro atual do terminal",
+    "/build-file <caminho> :: <objetivo> -> cria/abre um arquivo e prepara um prompt de implementação",
     "",
     "Comandos de automação:",
     "/queue-command -> envia o comando sugerido para a fila do Jarvis",
@@ -2827,6 +4615,20 @@ async function handleSlashCommand(prompt) {
     case "help":
       announceAssistantMessage(buildHelpGuide());
       return true;
+    case "mode":
+      if (!args) {
+        announceAssistantMessage("Uso: /mode chat|build|review|focus");
+        return true;
+      }
+      setWorkbenchMode(args.toLowerCase());
+      announceAssistantMessage(`Modo alterado para ${args.toLowerCase()}.`);
+      return true;
+    case "explain-file":
+      preparePromptForActiveFile();
+      return true;
+    case "debug-terminal":
+      preparePromptForTerminalDebug();
+      return true;
     case "open":
       if (!args) {
         announceAssistantMessage("Uso: /open caminho/do/arquivo");
@@ -2835,6 +4637,7 @@ async function handleSlashCommand(prompt) {
       await openWorkspaceFile(args);
       await appendSessionOperation({ kind: "slash_open", title: `Slash abriu ${args}`, path: args, detail: "arquivo aberto pelo composer" });
       announceAssistantMessage(`Arquivo aberto: ${args}`);
+      setWorkbenchMode("build");
       return true;
     case "search":
       if (!args) {
@@ -2869,7 +4672,7 @@ async function handleSlashCommand(prompt) {
         announceAssistantMessage("Uso: /new caminho/do/arquivo");
         return true;
       }
-      await api("/api/workspace/file", {
+      await api(`/api/workspace/file?session_id=${encodeURIComponent(currentSessionId || "")}`, {
         method: "POST",
         body: JSON.stringify({ path: args, content: "" }),
       });
@@ -2877,6 +4680,7 @@ async function handleSlashCommand(prompt) {
       await openWorkspaceFile(args);
       await appendSessionOperation({ kind: "slash_new", title: `Slash criou ${args}`, path: args, detail: "arquivo criado pelo composer" });
       announceAssistantMessage(`Arquivo criado: ${args}`);
+      setWorkbenchMode("build");
       return true;
     case "save-all":
       await saveAllEditors();
@@ -2904,6 +4708,32 @@ async function handleSlashCommand(prompt) {
       }
       announceAssistantMessage("Uso: /attach active");
       return true;
+    case "attach-terminal":
+      await attachTerminalSnapshot();
+      return true;
+    case "fix-terminal":
+      await preparePromptForTerminalFix();
+      return true;
+    case "build-file": {
+      if (!args) {
+        announceAssistantMessage("Uso: /build-file caminho/do/arquivo :: objetivo");
+        return true;
+      }
+      const [rawPath, rawGoal] = args.split("::");
+      const path = (rawPath || "").trim();
+      const goal = (rawGoal || "").trim();
+      if (!path) {
+        announceAssistantMessage("Uso: /build-file caminho/do/arquivo :: objetivo");
+        return true;
+      }
+      quickTargetPathEl.value = path;
+      if (goal) quickGoalEl.value = goal;
+      await setQuickFlowMode("create");
+      await ensureWorkspaceFile(path);
+      await runQuickFlowPrompt();
+      announceAssistantMessage(`Fluxo de implementação preparado para ${path}.`);
+      return true;
+    }
     case "git-status":
       await loadGitContext("status");
       announceAssistantMessage("Status Git carregado no painel lateral.");
@@ -2916,12 +4746,75 @@ async function handleSlashCommand(prompt) {
       await loadGitContext("log");
       announceAssistantMessage("Log Git carregado no painel lateral.");
       return true;
+    case "git-prs":
+      await loadGitContext("prs");
+      announceAssistantMessage("Pull requests carregados no painel lateral.");
+      return true;
+    case "git-issues":
+      await loadGitContext("issues");
+      announceAssistantMessage("Issues carregadas no painel lateral.");
+      return true;
     case "git-github":
       await loadGitContext("github");
       announceAssistantMessage("Contexto GitHub carregado no painel lateral.");
       return true;
     case "git-attach":
       await attachGitContextToChat();
+      setWorkbenchMode("review");
+      return true;
+    case "gh-pr-view":
+      if (!args) {
+        announceAssistantMessage("Uso: /gh-pr-view numero-da-pr");
+        return true;
+      }
+      await queueGitHubApproval(`gh pr view ${args} --comments`, `Visualizar PR #${args}`, "ação GitHub via gh enfileirada");
+      announceAssistantMessage(`PR #${args} enviada para a fila do Jarvis.`);
+      return true;
+    case "gh-pr-checkout":
+      if (!args) {
+        announceAssistantMessage("Uso: /gh-pr-checkout numero-da-pr");
+        return true;
+      }
+      await queueGitHubApproval(`gh pr checkout ${args}`, `Checkout da PR #${args}`, "ação GitHub via gh enfileirada");
+      announceAssistantMessage(`Checkout da PR #${args} enviado para a fila do Jarvis.`);
+      return true;
+    case "gh-pr-diff":
+      if (!args) {
+        announceAssistantMessage("Uso: /gh-pr-diff numero-da-pr");
+        return true;
+      }
+      await queueGitHubApproval(`gh pr diff ${args}`, `Diff da PR #${args}`, "ação GitHub via gh enfileirada");
+      announceAssistantMessage(`Diff da PR #${args} enviado para a fila do Jarvis.`);
+      return true;
+    case "gh-pr-create":
+      if (!args) {
+        announceAssistantMessage("Uso: /gh-pr-create titulo-da-pr");
+        return true;
+      }
+      await queueGitHubApproval(`gh pr create --title ${JSON.stringify(args)} --body ${JSON.stringify(buildGitHubBody(args))}`, `Criar PR: ${args}`, "ação GitHub via gh enfileirada");
+      announceAssistantMessage("Criação da PR enviada para a fila do Jarvis.");
+      return true;
+    case "gh-issue-view":
+      if (!args) {
+        announceAssistantMessage("Uso: /gh-issue-view numero-da-issue");
+        return true;
+      }
+      await queueGitHubApproval(`gh issue view ${args} --comments`, `Visualizar issue #${args}`, "ação GitHub via gh enfileirada");
+      announceAssistantMessage(`Issue #${args} enviada para a fila do Jarvis.`);
+      return true;
+    case "gh-issue-create":
+      if (!args) {
+        announceAssistantMessage("Uso: /gh-issue-create titulo-da-issue");
+        return true;
+      }
+      await queueGitHubApproval(`gh issue create --title ${JSON.stringify(args)} --body ${JSON.stringify(buildGitHubBody(args))}`, `Criar issue: ${args}`, "ação GitHub via gh enfileirada");
+      announceAssistantMessage("Criação da issue enviada para a fila do Jarvis.");
+      return true;
+    case "linux-terminal":
+      await openNativeLinuxTerminal();
+      return true;
+    case "linux-terminal-file":
+      await openNativeLinuxTerminalForActiveFile();
       return true;
     case "queue-command":
       await queueSuggestedCommandApproval();
@@ -2994,7 +4887,20 @@ function exportCurrentSessionMarkdown() {
       `## ${message.role === "user" ? "Você" : "Jarvis"}`,
       "",
       `${message.display_content || message.content}`,
-      "",
+      ...(Array.isArray(message.attachments) && message.attachments.length
+        ? [
+            "",
+            "### Anexos",
+            ...message.attachments.flatMap((attachment) => [
+              `- ${attachment.name} (${formatSize(Number(attachment.size) || String(attachment.content || "").length)})`,
+              "",
+              '```text',
+              `${truncateContext(String(attachment.content || ""), 4000)}`,
+              '```',
+              "",
+            ]),
+          ]
+        : [""]),
     ]),
   ].join("\n");
   const blob = new Blob([markdown], { type: "text/markdown;charset=utf-8" });

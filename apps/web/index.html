@@ -40,7 +40,7 @@
           <small>Opcional. Adicionado ao prompt como contexto explícito.</small>
         </section>
 
-        <section class="panel">
+        <section class="panel panel-chat-tools" data-sidebar-panel="chat">
           <label>Atalhos por agente</label>
           <div class="quick-actions">
             <button type="button" class="secondary quick-action" data-model="jarvis-safe" data-prompt="Resuma o contexto atual e sugira próximos passos.">Geral</button>
@@ -51,25 +51,35 @@
           </div>
         </section>
 
-        <section class="panel">
+        <section class="panel" data-sidebar-panel="chat">
           <button id="clear-chat" class="secondary">Limpar conversa</button>
           <button id="new-chat" class="secondary">Nova conversa</button>
           <button id="delete-chat" class="secondary danger">Excluir conversa</button>
           <button id="install-app" class="secondary hidden">Instalar app</button>
         </section>
 
-        <section class="panel">
+        <section class="panel" data-sidebar-panel="chat">
           <label for="session-title">Título da conversa</label>
           <input id="session-title" placeholder="Nova conversa" />
-          <small>Você pode renomear a conversa atual.</small>
+          <div class="session-current-actions">
+            <button id="pin-session" type="button" class="secondary">Fixar</button>
+            <button id="archive-session" type="button" class="secondary">Arquivar</button>
+          </div>
+          <small>Você pode renomear a conversa atual e controlar sua prioridade.</small>
         </section>
 
-        <section class="panel">
+        <section class="panel" data-sidebar-panel="chat">
           <label for="session-search">Buscar conversas</label>
-          <input id="session-search" placeholder="filtrar por título ou modelo" />
+          <input id="session-search" placeholder="filtrar por título, objetivo ou modelo" />
+          <div id="session-filters" class="session-filters">
+            <button type="button" class="secondary session-filter active" data-session-filter="active">Ativas</button>
+            <button type="button" class="secondary session-filter" data-session-filter="pinned">Fixadas</button>
+            <button type="button" class="secondary session-filter" data-session-filter="archived">Arquivadas</button>
+            <button type="button" class="secondary session-filter" data-session-filter="all">Todas</button>
+          </div>
         </section>
 
-        <section class="panel">
+        <section class="panel" data-sidebar-panel="chat">
           <label for="sessions">Conversas</label>
           <div id="sessions" class="sessions-list"></div>
         </section>
@@ -79,7 +89,7 @@
           <pre id="status">Carregando...</pre>
         </section>
 
-        <section class="panel">
+        <section class="panel" data-sidebar-panel="build">
           <label for="workspace-files">Workspace</label>
           <div class="workspace-actions">
             <button id="refresh-files" type="button" class="secondary">Atualizar</button>
@@ -97,7 +107,7 @@
           <div id="workspace-files" class="workspace-tree"></div>
         </section>
 
-        <section class="panel">
+        <section class="panel" data-sidebar-panel="build">
           <label for="terminal-cwd">Terminal Bash</label>
           <input id="terminal-cwd" placeholder="cwd inicial relativo, ex: apps/core" />
           <div id="terminal-sessions" class="terminal-sessions"></div>
@@ -106,6 +116,11 @@
             <button id="run-terminal-command" type="button" class="secondary">Executar</button>
             <button id="send-terminal-command" type="button" class="secondary">Enviar</button>
             <button id="cd-file-dir" type="button" class="secondary">Ir p/ arquivo</button>
+          </div>
+          <div class="terminal-bridge-row">
+            <button id="attach-terminal-context" type="button" class="secondary">Anexar terminal</button>
+            <button id="ask-terminal-context" type="button" class="secondary">Perguntar erro</button>
+            <button id="plan-terminal-context" type="button" class="secondary">Virar tarefa</button>
           </div>
           <div class="terminal-help-shell">
             <div class="terminal-help-header">
@@ -125,12 +140,26 @@
               <button id="git-diff" type="button" class="secondary">Diff</button>
               <button id="git-log" type="button" class="secondary">Log</button>
               <button id="git-github" type="button" class="secondary">GitHub</button>
+              <button id="git-prs" type="button" class="secondary">PRs</button>
+              <button id="git-issues" type="button" class="secondary">Issues</button>
+              <button id="git-pr-view" type="button" class="secondary">Ver PR</button>
+              <button id="git-pr-checkout" type="button" class="secondary">Checkout PR</button>
+              <button id="git-pr-diff" type="button" class="secondary">Diff PR</button>
+              <button id="git-pr-create" type="button" class="secondary">Criar PR</button>
+              <button id="git-issue-view" type="button" class="secondary">Ver Issue</button>
+              <button id="git-issue-create" type="button" class="secondary">Criar Issue</button>
               <button id="git-attach" type="button" class="secondary">Anexar Git</button>
+            </div>
+            <div class="git-form">
+              <input id="github-target" placeholder="PR/Issue alvo, ex: 123" />
+              <input id="github-title" placeholder="Título para PR/Issue, ex: melhorar fluxo do Jarvis" />
             </div>
             <pre id="git-output" class="git-output">Nenhum contexto Git carregado ainda.</pre>
           </div>
           <div class="terminal-row">
             <button id="new-terminal" type="button" class="secondary">Novo terminal</button>
+            <button id="native-terminal" type="button" class="secondary">Terminal Linux</button>
+            <button id="native-terminal-file" type="button" class="secondary">Linux no arquivo</button>
             <button id="close-terminal" type="button" class="secondary danger">Fechar atual</button>
             <button id="restart-terminal" type="button" class="secondary">Reiniciar</button>
             <button id="interrupt-terminal" type="button" class="secondary">Ctrl+C</button>
@@ -143,15 +172,80 @@
 
       <main class="chat-layout">
         <header class="chat-header">
-          <div>
-            <h2>Chat local</h2>
-            <p>Use o perfil safe para resposta mais estável no seu hardware.</p>
+          <div class="workbench-topbar">
+            <div>
+              <h2>Chat local</h2>
+              <p>Fluxo estilo Codex: conversar, agir no workspace e validar no terminal.</p>
+            </div>
+            <div class="workbench-mode-shell">
+              <div class="workbench-modes">
+                <button id="mode-chat" type="button" class="secondary workbench-mode active" data-mode="chat">Chat</button>
+                <button id="mode-build" type="button" class="secondary workbench-mode" data-mode="build">Build</button>
+                <button id="mode-review" type="button" class="secondary workbench-mode" data-mode="review">Review</button>
+                <button id="mode-focus" type="button" class="secondary workbench-mode" data-mode="focus">Focus</button>
+              </div>
+              <div class="replay-toolbar">
+                <button id="replay-session" type="button" class="secondary">Replay</button>
+                <button id="replay-toggle" type="button" class="secondary">Pausar</button>
+                <button id="replay-next" type="button" class="secondary">Próxima</button>
+                <button id="replay-stop" type="button" class="secondary danger">Sair do replay</button>
+                <span id="replay-status" class="replay-status">Replay inativo.</span>
+              </div>
+            </div>
+          </div>
+          <div id="workbench-status" class="workbench-status"></div>
+          <section class="mission-control-shell">
+            <div class="mission-control-header">
+              <div>
+                <strong>Missão Ativa</strong>
+                <p>Jarvis acompanha o estado atual e sugere a próxima melhor ação.</p>
+              </div>
+              <div class="mission-control-actions">
+                <button id="refresh-mission-control" type="button" class="secondary">Atualizar missão</button>
+                <button id="mission-briefing" type="button" class="secondary">Briefing</button>
+              </div>
+            </div>
+            <div class="mission-editor-shell">
+              <input id="mission-objective" placeholder="Objetivo atual da missão, ex: estabilizar o roteador local" />
+              <div class="mission-editor-row">
+                <input id="mission-status-input" placeholder="Status, ex: planejando, executando, verificando" />
+                <button id="save-mission" type="button" class="secondary">Salvar missão</button>
+              </div>
+              <textarea id="mission-next-steps-input" rows="3" placeholder="Próximos passos, um por linha"></textarea>
+            </div>
+            <div id="mission-status" class="mission-status"></div>
+            <div id="mission-next-actions" class="mission-next-actions"></div>
+            <section class="task-board-shell">
+              <div class="task-board-header">
+                <strong>Ciclo de Tarefas</strong>
+                <span>Planner → Executor → Verifier → Memory</span>
+              </div>
+              <div class="task-board-creator">
+                <input id="task-title" placeholder="Nova tarefa, ex: validar roteador local" />
+                <select id="task-phase">
+                  <option value="planner">planner</option>
+                  <option value="executor">executor</option>
+                  <option value="verifier">verifier</option>
+                  <option value="memory">memory</option>
+                </select>
+                <button id="create-task" type="button" class="secondary">Criar tarefa</button>
+              </div>
+              <div id="task-board" class="task-board"></div>
+            </section>
+          </section>
+
+          <div class="codex-prompt-dock">
+            <button id="open-command-palette" type="button" class="secondary">Palette</button>
+            <button id="prompt-active-file" type="button" class="secondary">Explicar arquivo atual</button>
+            <button id="prompt-terminal-debug" type="button" class="secondary">Diagnosticar terminal</button>
+            <button id="prompt-create-file" type="button" class="secondary">Criar arquivo com Jarvis</button>
+            <button id="prompt-next-step" type="button" class="secondary">Próximo passo</button>
           </div>
         </header>
 
         <section id="messages" class="messages" aria-live="polite"></section>
 
-        <section class="approval-shell">
+        <section class="approval-shell" data-main-panel="review">
           <div class="approval-header">
             <div>
               <strong>Fila de Ações do Jarvis</strong>
@@ -169,7 +263,7 @@
           <div id="approvals" class="approvals-list">Nenhuma ação pendente.</div>
         </section>
 
-        <section class="workspace-editor-shell">
+        <section class="workspace-editor-shell" data-main-panel="build">
           <div class="workspace-codex-grid">
             <div class="workspace-obsidian-shell">
               <div class="workspace-obsidian-header">
@@ -197,9 +291,43 @@
           <div class="workspace-history-shell">
             <div class="workspace-history-header">
               <strong>Histórico Operacional</strong>
-              <button id="refresh-operations" type="button" class="secondary">Atualizar histórico</button>
+              <div class="workspace-history-actions">
+                <button id="create-checkpoint" type="button" class="secondary">Criar checkpoint</button>
+                <button id="refresh-operations" type="button" class="secondary">Atualizar histórico</button>
+              </div>
+            </div>
+            <div class="checkpoint-shell">
+              <div class="checkpoint-header">
+                <strong>Checkpoints</strong>
+                <span>Marcos explícitos do trabalho para replay e restauração de contexto.</span>
+              </div>
+              <div id="session-checkpoints" class="session-checkpoints">Nenhum checkpoint ainda.</div>
+            </div>
+            <div class="timeline-shell">
+              <div class="timeline-header">
+                <strong>Timeline</strong>
+                <span>Operações, eventos e checkpoints ordenados por tempo.</span>
+              </div>
+              <div class="timeline-filters" id="timeline-filters">
+                <button type="button" class="secondary timeline-filter active" data-timeline-filter="all">Tudo</button>
+                <button type="button" class="secondary timeline-filter" data-timeline-filter="checkpoint">Checkpoints</button>
+                <button type="button" class="secondary timeline-filter" data-timeline-filter="operation">Operações</button>
+                <button type="button" class="secondary timeline-filter" data-timeline-filter="event">Eventos</button>
+                <button type="button" class="secondary timeline-filter" data-timeline-filter="file">Arquivos</button>
+                <button type="button" class="secondary timeline-filter" data-timeline-filter="terminal">Terminal</button>
+                <button type="button" class="secondary timeline-filter" data-timeline-filter="approval">Aprovações</button>
+                <button type="button" class="secondary timeline-filter" data-timeline-filter="task">Tarefas</button>
+              </div>
+              <div id="session-timeline" class="session-timeline">Nenhuma atividade ainda.</div>
             </div>
             <div id="session-operations" class="session-operations">Nenhum evento operacional ainda.</div>
+            <div class="event-stream-shell">
+              <div class="event-stream-header">
+                <strong>Event Stream</strong>
+                <span>task_created, command_executed, memory_updated, workspace_changed...</span>
+              </div>
+              <div id="session-events" class="session-events">Nenhum evento emitido ainda.</div>
+            </div>
           </div>
           <div class="workspace-editor-header">
             <strong id="editor-path">Nenhum arquivo aberto</strong>
@@ -235,6 +363,30 @@
         </section>
 
         <form id="chat-form" class="composer" data-dropzone="idle">
+          <section class="copilot-shell">
+            <div class="copilot-header">
+              <div>
+                <strong>Fluxo Rápido do Jarvis</strong>
+                <p>Modo Codex local: escolha a intenção, defina o alvo e mande o Jarvis agir.</p>
+              </div>
+            </div>
+            <div class="copilot-presets">
+              <button type="button" class="secondary quick-flow-button active" data-quick-flow="create">Criar</button>
+              <button type="button" class="secondary quick-flow-button" data-quick-flow="implement">Implementar</button>
+              <button type="button" class="secondary quick-flow-button" data-quick-flow="fix-terminal">Corrigir erro</button>
+              <button type="button" class="secondary quick-flow-button" data-quick-flow="review">Revisar</button>
+              <button type="button" class="secondary quick-flow-button" data-quick-flow="research">Pesquisar</button>
+            </div>
+            <div class="copilot-grid">
+              <input id="quick-target-path" placeholder="Alvo do workspace, ex: apps/web/chat-panel.js" />
+              <input id="quick-goal" placeholder="Objetivo, ex: criar um chat lateral com streaming" />
+            </div>
+            <div class="copilot-actions">
+              <button id="quick-open-target" type="button" class="secondary">Abrir/Criar alvo</button>
+              <button id="quick-build-prompt" type="button" class="secondary">Pedir ao Jarvis</button>
+              <button id="quick-stage-task" type="button" class="secondary">Levar para editor</button>
+            </div>
+          </section>
           <div class="composer-context">
             <div class="composer-context-row">
               <label class="context-toggle"><input id="ctx-active-file" type="checkbox" checked /> Arquivo ativo</label>
@@ -273,9 +425,22 @@
       </main>
     </div>
 
+    <div id="command-palette" class="command-palette hidden" aria-hidden="true">
+      <div id="command-palette-backdrop" class="command-palette-backdrop"></div>
+      <div class="command-palette-dialog" role="dialog" aria-modal="true" aria-labelledby="command-palette-title">
+        <div class="command-palette-header">
+          <strong id="command-palette-title">Command Palette</strong>
+          <button id="close-command-palette" type="button" class="secondary">Fechar</button>
+        </div>
+        <input id="command-palette-input" placeholder="Buscar comando, ex: abrir arquivo, terminal, modo build..." autocomplete="off" />
+        <div id="command-palette-results" class="command-palette-results"></div>
+      </div>
+    </div>
+
     <template id="message-template">
       <article class="message">
         <div class="message-role"></div>
+        <div class="message-meta"></div>
         <div class="message-body"></div>
       </article>
     </template>

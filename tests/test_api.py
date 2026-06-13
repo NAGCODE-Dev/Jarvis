@@ -105,6 +105,9 @@ def test_router_exposes_models_and_streams(tmp_path, monkeypatch):
 
     chunks = list(router.complete_stream("jarvis-safe", [ChatMessage(role="user", content="oi")]))
     assert "".join(chunks) == "ok"
+    metadata = router.describe_request("jarvis-programador", [ChatMessage(role="user", content="analise este codigo")])
+    assert metadata["effective_agent"] == "jarvis-programador"
+    assert metadata["task_type"] == "coding"
 
 
 def test_memory_and_workspace_context(tmp_path, monkeypatch):
@@ -137,7 +140,13 @@ def test_session_store_persists_messages_and_metadata(tmp_path, monkeypatch):
     monkeypatch.setattr(sessions_module, "settings", test_settings)
 
     store = SessionStore()
-    session = store.create_session(model="jarvis-safe", workspace="jarvis")
+    session = store.create_session(
+        model="jarvis-safe",
+        workspace="jarvis",
+        mission={"objective": "estabilizar jarvis", "status": "planning", "next_steps": ["revisar router"]},
+        ui_state={"active_file": "apps/web/app.js", "open_files": ["apps/web/app.js", "apps/web/styles.css"], "quick_flow_mode": "implement"},
+        meta={"pinned": True, "archived": False},
+    )
     updated = store.append_exchange(
         session["id"],
         user_content="oi",
@@ -145,14 +154,32 @@ def test_session_store_persists_messages_and_metadata(tmp_path, monkeypatch):
         assistant_content="ok",
         model="jarvis-safe",
         workspace="jarvis",
+        user_attachments=[{"name": "notes.txt", "content": "linha 1\nlinha 2", "size": 15}],
     )
 
     assert updated["messages"][0]["display_content"] == "Oi limpo"
+    assert updated["messages"][0]["attachments"][0]["name"] == "notes.txt"
+    assert "linha 1" in updated["messages"][0]["attachments"][0]["content"]
     assert updated["messages"][1]["content"] == "ok"
     assert updated["workspace"] == "jarvis"
+    assert "metadata" not in updated["messages"][1]
     assert updated["title"] == "Oi limpo"
     assert updated["operations"] == []
     assert updated["approvals"] == []
+    assert updated["mission"]["objective"] == "estabilizar jarvis"
+    assert updated["mission"]["status"] == "planning"
+    assert updated["ui_state"]["active_file"] == "apps/web/app.js"
+    assert updated["ui_state"]["open_files"] == ["apps/web/app.js", "apps/web/styles.css"]
+    assert updated["meta"]["pinned"] is True
+    assert updated["meta"]["archived"] is False
+    listed = store.list_sessions()
+    assert listed[0]["pinned"] is True
+    assert listed[0]["preview"] == "estabilizar jarvis"
+    checkpointed, checkpoint = store.create_checkpoint(session["id"], title="checkpoint inicial", summary="estado inicial")
+    assert checkpointed["checkpoints"][0]["title"] == "checkpoint inicial"
+    restored, restored_checkpoint = store.restore_checkpoint(session["id"], checkpoint["id"])
+    assert restored_checkpoint["id"] == checkpoint["id"]
+    assert restored["ui_state"]["active_file"] == "apps/web/app.js"
     assert Path(test_settings.sessions_dir / f"{session['id']}.json").exists()
 
 
@@ -202,9 +229,35 @@ def test_api_updates_can_clear_workspace_and_missing_session_returns_404(tmp_pat
     assert created.status_code == 200
     session_id = created.json()["session"]["id"]
 
-    cleared = client.put(f"/api/chat/sessions/{session_id}", json={"workspace": None})
+    cleared = client.put(
+        f"/api/chat/sessions/{session_id}",
+        json={
+            "workspace": None,
+            "mission": {"objective": "corrigir pwa", "status": "executando", "next_steps": ["validar smoke", "revisar diff"]},
+            "ui_state": {
+                "active_file": "apps/web/app.js",
+                "open_files": ["apps/web/app.js", "apps/web/styles.css"],
+                "quick_flow_mode": "fix-terminal",
+                "quick_target_path": "apps/web/app.js",
+                "quick_goal": "corrigir o streaming",
+                "draft_prompt": "analise o terminal",
+                "editor_instruction": "refatore o fluxo",
+                "terminal_command": "pytest -q",
+                "workbench_mode": "review",
+            },
+            "meta": {"pinned": True, "archived": False},
+        },
+    )
     assert cleared.status_code == 200
     assert cleared.json()["session"]["workspace"] is None
+    assert cleared.json()["session"]["mission"]["objective"] == "corrigir pwa"
+    assert cleared.json()["session"]["mission"]["status"] == "executando"
+    assert cleared.json()["session"]["mission"]["next_steps"] == ["validar smoke", "revisar diff"]
+    assert cleared.json()["session"]["ui_state"]["active_file"] == "apps/web/app.js"
+    assert cleared.json()["session"]["ui_state"]["quick_flow_mode"] == "fix-terminal"
+    assert cleared.json()["session"]["meta"]["pinned"] is True
+    assert cleared.json()["session"]["meta"]["archived"] is False
+    assert any(event["type"] == "session_context_updated" for event in cleared.json()["session"]["events"])
 
     operation = client.post(
         f"/api/chat/sessions/{session_id}/operations",
@@ -218,6 +271,59 @@ def test_api_updates_can_clear_workspace_and_missing_session_returns_404(tmp_pat
     )
     assert operation.status_code == 200
     assert operation.json()["session"]["operations"][0]["kind"] == "file_open"
+
+    checkpoint = client.post(
+        f"/api/chat/sessions/{session_id}/checkpoints",
+        json={"title": "checkpoint pwa", "summary": "antes da validação"},
+    )
+    assert checkpoint.status_code == 200
+    checkpoint_id = checkpoint.json()["checkpoint"]["id"]
+    assert checkpoint.json()["session"]["checkpoints"][0]["title"] == "checkpoint pwa"
+    assert any(event["type"] == "checkpoint_created" for event in checkpoint.json()["session"]["events"])
+
+    restored_checkpoint = client.post(f"/api/chat/sessions/{session_id}/checkpoints/{checkpoint_id}/restore")
+    assert restored_checkpoint.status_code == 200
+    assert restored_checkpoint.json()["session"]["ui_state"]["active_file"] == "apps/web/app.js"
+    assert any(event["type"] == "checkpoint_restored" for event in restored_checkpoint.json()["session"]["events"])
+
+    task_create = client.post(
+        f"/api/chat/sessions/{session_id}/tasks",
+        json={
+            "title": "Validar roteador local",
+            "objective": "fechar o ciclo planner executor verifier",
+            "phase": "planner",
+            "status": "todo",
+            "workspace": "jarvis",
+        },
+    )
+    assert task_create.status_code == 200
+    task_id = task_create.json()["task"]["id"]
+    assert task_create.json()["session"]["tasks"][0]["phase"] == "planner"
+
+    task_update = client.put(
+        f"/api/chat/sessions/{session_id}/tasks/{task_id}",
+        json={"phase": "executor", "status": "in_progress"},
+    )
+    assert task_update.status_code == 200
+    assert task_update.json()["task"]["phase"] == "executor"
+    assert task_update.json()["task"]["status"] == "in_progress"
+    assert any(event["type"] == "task_updated" for event in task_update.json()["session"]["events"])
+
+    task_done = client.put(
+        f"/api/chat/sessions/{session_id}/tasks/{task_id}",
+        json={"phase": "memory", "status": "done"},
+    )
+    assert task_done.status_code == 200
+    assert any(item.get("source") == "auto" and item.get("trigger_event") == "task_completed" for item in task_done.json()["session"].get("checkpoints", []))
+
+    terminal_run = client.post(
+        f"/api/terminal/run?session_id={session_id}",
+        json={"command": "printf terminal-ok", "cwd": "."},
+    )
+    assert terminal_run.status_code == 200
+    refreshed = client.get(f"/api/chat/sessions/{session_id}")
+    assert refreshed.status_code == 200
+    assert any(event["type"] == "command_executed" for event in refreshed.json()["session"]["events"])
 
     approval = client.post(
         f"/api/chat/sessions/{session_id}/approvals",
@@ -240,6 +346,7 @@ def test_api_updates_can_clear_workspace_and_missing_session_returns_404(tmp_pat
     assert applied.status_code == 200
     assert applied.json()["approval"]["status"] == "applied"
     assert "approval-ok" in applied.json()["result"]["output"]
+    assert any(item.get("source") == "auto" and item.get("trigger_event") == "approval_applied" for item in applied.json()["session"].get("checkpoints", []))
 
     missing = client.get("/api/chat/sessions/does-not-exist")
     assert missing.status_code == 404
@@ -275,10 +382,18 @@ def test_api_session_message_updates_hierarchical_memory(tmp_path, monkeypatch):
 
     response = client.post(
         f"/api/chat/sessions/{session_id}/message",
-        json={"model": "jarvis-safe", "content": "continuar o projeto jarvis", "display_content": "Continuar o projeto Jarvis", "workspace": "jarvis"},
+        json={
+            "model": "jarvis-safe",
+            "content": "continuar o projeto jarvis",
+            "display_content": "Continuar o projeto Jarvis",
+            "workspace": "jarvis",
+            "attachments": [{"name": "brief.md", "content": "objetivo atual\n- estabilizar pwa", "size": 30}],
+        },
     )
 
     assert response.status_code == 200
+    assert response.json()["session"]["messages"][0]["attachments"][0]["name"] == "brief.md"
+    assert response.json()["session"]["messages"][-1]["metadata"]["effective_agent"] == "jarvis-safe"
     payload = test_settings.current_context_path.read_text(encoding="utf-8")
     assert "Continuar o projeto Jarvis" in payload
     assert '"topic": "jarvis"' in payload
@@ -315,6 +430,14 @@ def test_workspace_and_terminal_api(tmp_path, monkeypatch):
     monkeypatch.setattr(sessions_module, "settings", test_settings)
     monkeypatch.setattr(terminal_module, "settings", test_settings)
     monkeypatch.setattr(workspace_module, "settings", test_settings)
+
+    native_calls = []
+
+    def fake_open_native(self, cwd=None):
+        native_calls.append(cwd)
+        return {"cwd": cwd or ".", "launcher": "x-terminal-emulator", "pid": 1234, "shell": "bash"}
+
+    monkeypatch.setattr(terminal_module.TerminalService, "open_native", fake_open_native)
 
     app = FastAPI()
     app.include_router(create_api_router(ollama=FakeOllama(), memory=MemoryManager(), knowledge=FakeKnowledge()))
@@ -423,6 +546,11 @@ def test_workspace_and_terminal_api(tmp_path, monkeypatch):
     terminal = client.post("/api/terminal/run", json={"command": "printf 'jarvis'", "cwd": "."})
     assert terminal.status_code == 200
     assert "jarvis" in terminal.json()["result"]["output"]
+
+    native_terminal = client.post("/api/terminal/native", json={"cwd": "notes"})
+    assert native_terminal.status_code == 200
+    assert native_terminal.json()["result"]["launcher"] == "x-terminal-emulator"
+    assert native_calls == ["notes"]
 
     created_terminal = client.post("/api/terminal/sessions", json={"cwd": ".", "cols": 80, "rows": 24})
     assert created_terminal.status_code == 200

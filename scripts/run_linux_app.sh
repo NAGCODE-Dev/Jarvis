@@ -17,7 +17,7 @@ start_if_needed() {
   fi
   echo "[jarvis-linux] Iniciando Jarvis local..."
   # shellcheck disable=SC2086
-  "$ROOT_DIR/scripts/boot_local.sh" $BOOT_ARGS >/dev/null 2>&1
+  "$ROOT_DIR/scripts/jarvis.sh" boot $BOOT_ARGS >/dev/null 2>&1
 }
 
 find_browser() {

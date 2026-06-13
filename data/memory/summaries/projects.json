@@ -1,7 +1,5 @@
 {
-  "topic": "jarvis",
-  "workspace": "jarvis",
-  "items": [
+  "facts": [
     {
       "text": "pwa smoke",
       "kind": "facts",
@@ -12,5 +10,9 @@
       "updated_at": "2026-06-12T19:11:55+00:00"
     }
   ],
-  "last_used_at": "2026-06-13T21:50:44+00:00"
+  "preferences": [],
+  "goals": [],
+  "decisions": [],
+  "projects": [],
+  "updated_at": "2026-06-13T20:43:37+00:00"
 }
