@@ -780,7 +780,7 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
     def run_terminal_command(request: TerminalRunRequest, session_id: str | None = None):
         result = workspace_call(terminal.run, request.command, cwd=request.cwd)
         if session_id:
-            emit_session_event(session_id, "command_executed", {"command": request.command, "cwd": request.cwd, "exit_code": result.get("exit_code")}, source="terminal")
+            emit_session_event(session_id, "command_executed", {"command": request.command, "cwd": request.cwd, "exit_code": result.get("exit_code"), "output_tail": str(result.get("output") or "")[-2000:] or None}, source="terminal")
         return {"status": "ok", "result": result}
 
     @router.post("/api/terminal/native")
@@ -806,7 +806,7 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
     def write_terminal_session(session_id: str, request: TerminalSessionWriteRequest, chat_session_id: str | None = None):
         result = workspace_call(terminal.write, session_id, request.data, wait_ms=request.wait_ms)
         if chat_session_id:
-            emit_session_event(chat_session_id, "command_executed", {"terminal_session_id": session_id, "command": request.data.strip(), "exit_code": result.get("exit_code")}, source="terminal")
+            emit_session_event(chat_session_id, "command_executed", {"terminal_session_id": session_id, "command": request.data.strip(), "exit_code": result.get("exit_code"), "output_tail": str(result.get("output") or "")[-2000:] or None}, source="terminal")
         return {"status": "ok", "result": result}
 
     @router.post("/api/terminal/sessions/{session_id}/resize")
@@ -1347,6 +1347,28 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
             assistant_metadata=assistant_metadata,
             user_attachments=[attachment.model_dump() for attachment in (request.attachments or [])],
         )
+        sessions.append_operation(
+            session_id,
+            kind="chat_turn",
+            title="Executou turno de chat",
+            detail=(request.display_content or request.content)[:240],
+            metadata={"chat_turn": True, "stream": False},
+        )
+        updated, turn = sessions.append_turn(
+            session_id,
+            kind="chat_turn",
+            title="Turno de chat",
+            summary=content[:4000] or None,
+            workspace=request.workspace,
+            model=request.model,
+            user_prompt=request.display_content or request.content,
+            snapshot={
+                "workspace": request.workspace,
+                "mission": updated.get("mission") or None,
+                "ui_state": updated.get("ui_state") or None,
+            },
+            metadata={**assistant_metadata, "workspace_turn": False},
+        )
         memory.record_exchange(
             user_content=user_content,
             user_display_content=request.display_content,
@@ -1354,8 +1376,9 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
             model=request.model,
             workspace=request.workspace,
         )
+        emit_session_event(session_id, "chat_turn_created", {"workspace": request.workspace, "turn_id": turn.get("id")}, source="chat")
         emit_session_event(session_id, "memory_updated", {"workspace": request.workspace, "model": request.model}, source="memory")
-        return {"status": "ok", "session": updated, "message": content}
+        return {"status": "ok", "session": sessions.get_session(session_id), "message": content, "turn": turn}
 
     @router.post("/api/chat/sessions/{session_id}/message/stream")
     def create_chat_session_message_stream(session_id: str, request: SessionMessageRequest):
@@ -1389,6 +1412,28 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
                     assistant_metadata=assistant_metadata,
                     user_attachments=[attachment.model_dump() for attachment in (request.attachments or [])],
                 )
+                sessions.append_operation(
+                    session_id,
+                    kind="chat_turn",
+                    title="Executou turno de chat",
+                    detail=(request.display_content or request.content)[:240],
+                    metadata={"chat_turn": True, "stream": True},
+                )
+                updated, turn = sessions.append_turn(
+                    session_id,
+                    kind="chat_turn",
+                    title="Turno de chat",
+                    summary=assistant_content[:4000] or None,
+                    workspace=request.workspace,
+                    model=request.model,
+                    user_prompt=request.display_content or request.content,
+                    snapshot={
+                        "workspace": request.workspace,
+                        "mission": updated.get("mission") or None,
+                        "ui_state": updated.get("ui_state") or None,
+                    },
+                    metadata={**assistant_metadata, "workspace_turn": False},
+                )
                 memory.record_exchange(
                     user_content=user_content,
                     user_display_content=request.display_content,
@@ -1396,8 +1441,9 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
                     model=request.model,
                     workspace=request.workspace,
                 )
+                emit_session_event(session_id, "chat_turn_created", {"workspace": request.workspace, "turn_id": turn.get("id")}, source="chat")
                 emit_session_event(session_id, "memory_updated", {"workspace": request.workspace, "model": request.model}, source="memory")
-                done_payload = {"type": "done", "session": updated, "message": assistant_content}
+                done_payload = {"type": "done", "session": sessions.get_session(session_id), "message": assistant_content, "turn": turn}
                 yield f"data: {json.dumps(done_payload)}\n\n"
                 yield "data: [DONE]\n\n"
             except Exception as exc:

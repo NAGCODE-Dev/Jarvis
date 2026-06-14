@@ -373,11 +373,55 @@
       "importance": 1,
       "model": "jarvis-programador-safe",
       "timestamp": "2026-06-14T15:52:31+00:00"
+    },
+    {
+      "role": "user",
+      "content": "[WORKSPACE: jarvis]\nresponda somente OK",
+      "display_content": "pwa smoke",
+      "workspace": "jarvis",
+      "topic": "jarvis",
+      "summary_bucket": "projects",
+      "importance": 5,
+      "model": "jarvis-programador-safe",
+      "timestamp": "2026-06-14T22:17:39+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "OK",
+      "display_content": null,
+      "workspace": "jarvis",
+      "topic": "jarvis",
+      "summary_bucket": "projects",
+      "importance": 1,
+      "model": "jarvis-programador-safe",
+      "timestamp": "2026-06-14T22:17:39+00:00"
+    },
+    {
+      "role": "user",
+      "content": "[WORKSPACE: jarvis]\nresponda somente OK",
+      "display_content": "pwa smoke",
+      "workspace": "jarvis",
+      "topic": "jarvis",
+      "summary_bucket": "projects",
+      "importance": 5,
+      "model": "jarvis-programador-safe",
+      "timestamp": "2026-06-14T22:21:39+00:00"
+    },
+    {
+      "role": "assistant",
+      "content": "OK",
+      "display_content": null,
+      "workspace": "jarvis",
+      "topic": "jarvis",
+      "summary_bucket": "projects",
+      "importance": 1,
+      "model": "jarvis-programador-safe",
+      "timestamp": "2026-06-14T22:21:39+00:00"
     }
   ],
   "active_topics": [
     "jarvis"
   ],
-  "updated_at": "2026-06-14T15:52:31+00:00",
+  "updated_at": "2026-06-14T22:21:39+00:00",
   "last_compacted_at": "2026-06-13T20:43:37+00:00"
 }

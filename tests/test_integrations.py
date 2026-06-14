@@ -272,6 +272,8 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert 'id="session-search"' in html
     assert 'id="export-chat"' in html
     assert 'id="send-codex"' in html
+    assert 'id="stream-status"' in html
+    assert 'id="cancel-stream"' in html
     assert "normalizeSessionMeta" in js
     assert "setSessionFilter" in js
     assert "toggleCurrentSessionMeta" in js
@@ -326,6 +328,11 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert 'id="terminal-sessions"' in html
     assert 'id="interrupt-terminal"' in html
     assert 'id="terminal-command"' in html
+    assert 'id="terminal-repeat-last"' in html
+    assert 'id="terminal-open-mentioned-file"' in html
+    assert 'id="terminal-fix-now"' in html
+    assert 'id="terminal-task-now"' in html
+    assert 'id="terminal-assistant-status"' in html
     assert 'id="run-terminal-command"' in html
     assert 'id="send-terminal-command"' in html
     assert 'id="cd-file-dir"' in html
@@ -405,6 +412,12 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "openNativeLinuxTerminal" in js
     assert "openNativeLinuxTerminalForActiveFile" in js
     assert "runTerminalCommandFromInput" in js
+    assert "repeatLatestTerminalCommand" in js
+    assert "openMentionedTerminalFile" in js
+    assert "renderTerminalAssistant" in js
+    assert "cancelActiveStream" in js
+    assert "startStreamController" in js
+    assert "setStreamingUi" in js
     assert "renderRecentFiles" in js
     assert "renderSlashCommands" in js
     assert "loadWorkbenchMode" in js
@@ -533,6 +546,8 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "workspace-search-row" in css
     assert "terminal-session-chip" in css
     assert "composer-context-preview" in css
+    assert "composer-runtime-shell" in css
+    assert "stream-status" in css
     assert "editor-selection" in css
     assert "workspace-history-shell" in css
     assert "session-operation-card" in css
@@ -550,6 +565,8 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "obsidian-automation-row" in css
     assert "recent-files" in css
     assert "terminal-command-row" in css
+    assert "terminal-assistant-shell" in css
+    assert "terminal-assistant-status" in css
     assert "terminal-help-shell" in css
     assert "command-history" in css
     assert "command-history-chip" in css

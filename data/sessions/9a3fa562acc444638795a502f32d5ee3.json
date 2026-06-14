@@ -1,0 +1,145 @@
+{
+  "id": "9a3fa562acc444638795a502f32d5ee3",
+  "title": "PWA Smoke",
+  "model": "jarvis-programador-safe",
+  "workspace": "jarvis",
+  "created_at": "2026-06-14T22:17:25+00:00",
+  "updated_at": "2026-06-14T22:17:39+00:00",
+  "messages": [
+    {
+      "role": "user",
+      "content": "[WORKSPACE: jarvis]\nresponda somente OK",
+      "display_content": "pwa smoke"
+    },
+    {
+      "role": "assistant",
+      "content": "OK",
+      "metadata": {
+        "visible_model": "jarvis-programador-safe",
+        "effective_agent": "jarvis-programador-safe",
+        "route_kind": "coder",
+        "workspace": null,
+        "use_rag": false,
+        "task_type": "coding",
+        "primary_model": "qwen2.5-coder:1.5b",
+        "fallback_model": "qwen2.5:3b",
+        "profile": "safe"
+      }
+    }
+  ],
+  "operations": [
+    {
+      "kind": "chat_turn",
+      "title": "Executou turno de chat",
+      "path": null,
+      "command": null,
+      "detail": "pwa smoke",
+      "metadata": {
+        "chat_turn": true,
+        "stream": true
+      },
+      "created_at": "2026-06-14T22:17:39+00:00"
+    }
+  ],
+  "approvals": [],
+  "mission": {
+    "objective": null,
+    "status": "idle",
+    "next_steps": [],
+    "updated_at": "2026-06-14T22:17:25+00:00"
+  },
+  "ui_state": {
+    "active_file": null,
+    "open_files": [],
+    "quick_flow_mode": null,
+    "quick_target_path": null,
+    "quick_goal": null,
+    "draft_prompt": null,
+    "editor_instruction": null,
+    "terminal_command": null,
+    "workbench_mode": null,
+    "terminal_tail": null,
+    "pending_attachments": [],
+    "pending_edit_proposal": null,
+    "pending_batch_proposal": null,
+    "pending_task_assist": null,
+    "updated_at": "2026-06-14T22:17:25+00:00"
+  },
+  "meta": {
+    "pinned": false,
+    "archived": false
+  },
+  "tasks": [],
+  "events": [
+    {
+      "type": "chat_turn_created",
+      "payload": {
+        "workspace": "jarvis",
+        "turn_id": "b14556b3bcad4f0d93b04db782c23aea",
+        "source": "chat"
+      },
+      "source": "chat",
+      "created_at": "2026-06-14T22:17:39+00:00"
+    },
+    {
+      "type": "memory_updated",
+      "payload": {
+        "workspace": "jarvis",
+        "model": "jarvis-programador-safe",
+        "source": "memory"
+      },
+      "source": "memory",
+      "created_at": "2026-06-14T22:17:39+00:00"
+    }
+  ],
+  "checkpoints": [],
+  "turns": [
+    {
+      "id": "b14556b3bcad4f0d93b04db782c23aea",
+      "kind": "chat_turn",
+      "title": "Turno de chat",
+      "summary": "OK",
+      "path": null,
+      "workspace": "jarvis",
+      "model": "jarvis-programador-safe",
+      "user_prompt": "pwa smoke",
+      "suggested_command": null,
+      "edit_instruction": null,
+      "approvals": [],
+      "task_assist": null,
+      "metadata": {
+        "queued_approvals": 0,
+        "route_kind": "coder",
+        "effective_agent": "jarvis-programador-safe",
+        "workspace_turn": false
+      },
+      "snapshot": {
+        "ui_state": {
+          "active_file": null,
+          "open_files": [],
+          "quick_flow_mode": null,
+          "quick_target_path": null,
+          "quick_goal": null,
+          "draft_prompt": null,
+          "editor_instruction": null,
+          "terminal_command": null,
+          "workbench_mode": null,
+          "terminal_tail": null,
+          "pending_attachments": [],
+          "pending_edit_proposal": null,
+          "pending_batch_proposal": null,
+          "pending_task_assist": null,
+          "updated_at": "2026-06-14T22:17:39+00:00"
+        },
+        "mission": {
+          "objective": null,
+          "status": "idle",
+          "next_steps": [],
+          "updated_at": "2026-06-14T22:17:39+00:00"
+        },
+        "workspace": "jarvis"
+      },
+      "created_at": "2026-06-14T22:17:39+00:00"
+    }
+  ]
+}

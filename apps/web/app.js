@@ -58,6 +58,8 @@ const openSessionNoteButton = document.querySelector("#open-session-note");
 const attachSessionNoteButton = document.querySelector("#attach-session-note");
 const exportChatButton = document.querySelector("#export-chat");
 const sendCodexButton = document.querySelector("#send-codex");
+const streamStatusEl = document.querySelector("#stream-status");
+const cancelStreamButton = document.querySelector("#cancel-stream");
 const promptActiveFileButton = document.querySelector("#prompt-active-file");
 const promptTerminalDebugButton = document.querySelector("#prompt-terminal-debug");
 const promptCreateFileButton = document.querySelector("#prompt-create-file");
@@ -143,6 +145,11 @@ const restartTerminalButton = document.querySelector("#restart-terminal");
 const interruptTerminalButton = document.querySelector("#interrupt-terminal");
 const clearTerminalViewButton = document.querySelector("#clear-terminal-view");
 const terminalOutputEl = document.querySelector("#terminal-output");
+const terminalRepeatLastButton = document.querySelector("#terminal-repeat-last");
+const terminalOpenMentionedFileButton = document.querySelector("#terminal-open-mentioned-file");
+const terminalFixNowButton = document.querySelector("#terminal-fix-now");
+const terminalTaskNowButton = document.querySelector("#terminal-task-now");
+const terminalAssistantStatusEl = document.querySelector("#terminal-assistant-status");
 const rememberNoteButton = document.querySelector("#remember-note");
 const indexNoteButton = document.querySelector("#index-note");
 const chatAboutNoteButton = document.querySelector("#chat-about-note");
@@ -229,6 +236,8 @@ let workbenchMode = "chat";
 let quickFlowMode = "create";
 let commandPaletteOpen = false;
 let terminalUiStateSaveTimer = null;
+let activeStreamController = null;
+let activeStreamKind = null;
 
 function truncateTail(content, limit = 12000) {
   const text = String(content || "");
@@ -521,6 +530,7 @@ async function loadCurrentSessionOperations() {
   renderApprovals();
   renderEventStream();
   renderMissionControl();
+  renderTerminalAssistant();
 }
 
 async function loadCurrentSessionApprovals() {
@@ -670,9 +680,10 @@ function buildSessionTimelineItems() {
   const turnItems = currentSessionTurns.map((item) => ({
     kind: "turn",
     created_at: item.created_at,
-    title: item.title || "Turno operacional",
+    title: item.title || (item.turn_kind === "chat_turn" ? "Turno de chat" : "Turno operacional"),
     detail: [item.path, item.summary, item.suggested_command ? `$ ${item.suggested_command}` : null, item.workspace ? `workspace: ${item.workspace}` : null].filter(Boolean).join("\n"),
     turn_id: item.id,
+    turn_kind: item.kind || "workspace_turn",
   }));
   return [...operationItems, ...eventItems, ...checkpointItems, ...turnItems]
     .filter((item) => item.created_at)
@@ -726,7 +737,7 @@ function renderSessionTimeline() {
       const restoreButton = document.createElement("button");
       restoreButton.type = "button";
       restoreButton.className = "secondary";
-      restoreButton.textContent = "Restaurar turno";
+      restoreButton.textContent = turn.kind === "chat_turn" ? "Restaurar chat" : "Restaurar turno";
       restoreButton.addEventListener("click", async () => {
         await restoreSessionTurn(item.turn_id);
       });
@@ -741,13 +752,15 @@ function renderSessionTurns() {
   if (!sessionTurnsEl) return;
   sessionTurnsEl.innerHTML = "";
   if (!currentSessionTurns.length) {
-    sessionTurnsEl.textContent = "Nenhum turno operacional ainda.";
+    sessionTurnsEl.textContent = "Nenhum turno salvo ainda.";
     return;
   }
   for (const turn of [...currentSessionTurns].reverse().slice(0, 16)) {
     const card = document.createElement("div");
     card.className = "session-turn-card";
-    card.innerHTML = `<strong>${escapeHtml(turn.title || "Turno operacional")}</strong><span>${escapeHtml([turn.path, turn.summary, turn.suggested_command ? `$ ${turn.suggested_command}` : null, turn.created_at].filter(Boolean).join("\n") || "turno operacional")}</span>`;
+    const turnTitle = turn.title || (turn.kind === "chat_turn" ? "Turno de chat" : "Turno operacional");
+    const fallbackDetail = turn.kind === "chat_turn" ? "turno de chat" : "turno operacional";
+    card.innerHTML = `<strong>${escapeHtml(turnTitle)}</strong><span>${escapeHtml([turn.path, turn.summary, turn.suggested_command ? `$ ${turn.suggested_command}` : null, turn.created_at].filter(Boolean).join("\n") || fallbackDetail)}</span>`;
     const actions = document.createElement("div");
     actions.className = "session-turn-actions";
     const restoreButton = document.createElement("button");
@@ -985,6 +998,10 @@ for (const button of quickFlowButtons) {
     await setQuickFlowMode(button.dataset.quickFlow || "create");
   });
 }
+
+cancelStreamButton?.addEventListener("click", () => {
+  cancelActiveStream();
+});
 
 refreshMissionControlButton.addEventListener("click", () => {
   renderMissionControl();
@@ -1590,6 +1607,22 @@ syncSessionNoteButton.addEventListener("click", async () => {
   await syncCurrentSessionNoteToObsidian();
 });
 
+terminalRepeatLastButton?.addEventListener("click", async () => {
+  await repeatLatestTerminalCommand();
+});
+
+terminalOpenMentionedFileButton?.addEventListener("click", async () => {
+  await openMentionedTerminalFile();
+});
+
+terminalFixNowButton?.addEventListener("click", async () => {
+  await preparePromptForTerminalFix();
+});
+
+terminalTaskNowButton?.addEventListener("click", async () => {
+  await createTerminalFollowupTask();
+});
+
 terminalOutputEl.addEventListener("click", () => {
   terminalOutputEl.focus();
 });
@@ -1745,6 +1778,10 @@ async function submitStandardChatPrompt() {
     await loadSessions();
   } catch (error) {
     stopSessionReplay({ render: false });
+    if (isStreamAbortError(error)) {
+      renderMessages();
+      return;
+    }
     messages = messages.slice(0, Math.max(0, messages.length - 2));
     renderMessages();
     appendMessageElement("assistant", `Erro ao falar com o Jarvis: ${error.message}`);
@@ -1832,6 +1869,10 @@ async function submitWorkspaceChatPrompt() {
     await loadSessions();
   } catch (error) {
     stopSessionReplay({ render: false });
+    if (isStreamAbortError(error)) {
+      renderMessages();
+      return;
+    }
     messages = messages.slice(0, Math.max(0, messages.length - 2));
     renderMessages();
     appendMessageElement("assistant", `Erro ao executar o fluxo operacional do Jarvis: ${error.message}`);
@@ -2920,6 +2961,8 @@ function buildCommandPaletteItems() {
     { label: "Fluxo rápido: pedir ao Jarvis", description: "Gera prompt com intenção, alvo e objetivo atuais", keywords: ["quick", "prompt", "codex", "jarvis"], action: async () => { await runQuickFlowPrompt(); } },
     { label: "Jarvis agir no workspace", description: "Usa o prompt atual para gerar diff, comando e fila operacional", keywords: ["delegate", "codex", "workspace", "apply"], action: async () => { await submitWorkspaceChatPrompt(); } },
     { label: "Anexar terminal ao chat", description: "Leva a saída recente do bash para o próximo prompt", keywords: ["terminal", "attach", "bash", "chat"], action: async () => { await attachTerminalSnapshot(); } },
+{ label: "Repetir ultimo comando", description: "Executa novamente o ultimo comando conhecido do terminal", keywords: ["terminal", "repeat", "last", "command"], action: async () => { await repeatLatestTerminalCommand(); } },
+    { label: "Abrir arquivo citado no terminal", description: "Tenta abrir no editor o arquivo mencionado na saída recente", keywords: ["terminal", "file", "open", "error"], action: async () => { await openMentionedTerminalFile(); setWorkbenchMode("build"); } },
     { label: "Explicar arquivo atual", description: active ? active.path : "Requer um arquivo aberto", keywords: ["explain", "arquivo", "analise"], action: async () => { preparePromptForActiveFile(); } },
     { label: "Diagnosticar terminal", description: "Usa a saída recente do terminal como contexto", keywords: ["debug", "terminal", "bash"], action: async () => { await preparePromptForTerminalFix(); } },
     { label: "Próximo passo sugerido", description: `Planejar próxima ação no workspace ${workspace}`, keywords: ["next", "step", "planner", "workspace"], action: async () => { preparePromptForNextStep(); } },
@@ -3458,6 +3501,72 @@ async function createTerminalFollowupTask() {
   announceAssistantMessage("Saída recente do terminal convertida em tarefa do ciclo planner → executor → verifier → memory.");
 }
 
+
+function getLatestTerminalEvent() {
+  return [...currentEvents].reverse().find((item) => item?.type === "command_executed") || null;
+}
+
+function extractTerminalMentionedPath() {
+  const sources = [
+    String(getLatestTerminalEvent()?.payload?.output_tail || ""),
+    String(terminalBuffer || ""),
+  ];
+  const pattern = /([A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)+\.[A-Za-z0-9_-]+)/g;
+  for (const source of sources) {
+    const matches = source.match(pattern) || [];
+    for (const item of matches) {
+      const value = String(item).replace(/^\.\//, "").trim();
+      if (!value.startsWith("http") && value.includes("/")) return value;
+    }
+  }
+  return null;
+}
+
+async function repeatLatestTerminalCommand() {
+  const latest = getLatestTerminalEvent();
+  const command = String(latest?.payload?.command || commandHistory[0] || "").trim();
+  if (!command) {
+    announceAssistantMessage("Nenhum comando recente para repetir.");
+    return;
+  }
+  terminalCommandEl.value = command;
+  await runTerminalCommandFromInput();
+}
+
+async function openMentionedTerminalFile() {
+  const candidate = extractTerminalMentionedPath();
+  if (!candidate) {
+    announceAssistantMessage("Nenhum arquivo citado foi encontrado na saída recente do terminal.");
+    return;
+  }
+  try {
+    await openWorkspaceFile(candidate);
+    setWorkbenchMode("build");
+    announceAssistantMessage(`Arquivo citado aberto: ${candidate}`);
+  } catch {
+    announceAssistantMessage(`O terminal citou ${candidate}, mas o arquivo não pôde ser aberto no workspace atual.`);
+  }
+}
+
+function renderTerminalAssistant() {
+  if (!terminalAssistantStatusEl) return;
+  const latest = getLatestTerminalEvent();
+  const command = String(latest?.payload?.command || commandHistory[0] || "").trim();
+  const exitCode = latest?.payload?.exit_code;
+  const mentionedPath = extractTerminalMentionedPath();
+  const hasRecentOutput = Boolean(getRecentTerminalExcerpt(1200));
+  terminalAssistantStatusEl.textContent = [
+    command ? `Ultimo comando: ${command}` : "Ultimo comando: nenhum registrado",
+    exitCode !== undefined && exitCode !== null ? `Exit code: ${exitCode}` : "Exit code: desconhecido ou ainda nao registrado",
+    mentionedPath ? `Arquivo citado: ${mentionedPath}` : "Arquivo citado: nenhum detectado na saida recente",
+    hasRecentOutput ? "Contexto recente do terminal pronto para diagnostico." : "Ainda sem saida recente suficiente para diagnostico.",
+  ].join("\n");
+  if (terminalRepeatLastButton) terminalRepeatLastButton.disabled = !command;
+  if (terminalOpenMentionedFileButton) terminalOpenMentionedFileButton.disabled = !mentionedPath;
+  if (terminalFixNowButton) terminalFixNowButton.disabled = !hasRecentOutput;
+  if (terminalTaskNowButton) terminalTaskNowButton.disabled = !hasRecentOutput || !currentSessionId;
+}
+
 function renderWorkbenchStatus() {
   if (!workbenchStatusEl) return;
   const active = getCurrentEditor();
@@ -3883,6 +3992,7 @@ async function sendTerminalData(data) {
 function renderTerminal() {
   terminalOutputEl.textContent = terminalBuffer || "Terminal pronto.";
   terminalOutputEl.scrollTop = terminalOutputEl.scrollHeight;
+  renderTerminalAssistant();
   renderComposerContextPreview();
   scheduleTerminalSnapshotSave();
 }
@@ -5450,11 +5560,67 @@ async function executeStarterResumeAction(kind, context = {}) {
   await startGettingStartedFlow("inspect-project");
 }
 
+function isStreamAbortError(error) {
+  return error?.name === "AbortError" || error?.message === "stream_cancelled";
+}
+
+function setStreamingUi({ active = false, kind = null, message = null, tone = "idle" } = {}) {
+  if (streamStatusEl) {
+    streamStatusEl.textContent = message || (active ? `Jarvis respondendo via ${kind === "workspace" ? "modo operacional" : "chat"}...` : "Pronto para conversar.");
+    streamStatusEl.classList.toggle("active", active);
+    streamStatusEl.classList.toggle("cancelled", tone === "cancelled");
+    streamStatusEl.classList.toggle("error", tone === "error");
+  }
+  if (cancelStreamButton) {
+    cancelStreamButton.disabled = !active;
+  }
+  form.dataset.streaming = active ? "active" : tone;
+}
+
+function clearActiveStreamController(controller = null) {
+  if (!controller || activeStreamController === controller) {
+    activeStreamController = null;
+    activeStreamKind = null;
+  }
+}
+
+function startStreamController(kind) {
+  if (activeStreamController) {
+    try {
+      activeStreamController.abort();
+    } catch {
+      // ignore
+    }
+  }
+  const controller = new AbortController();
+  activeStreamController = controller;
+  activeStreamKind = kind;
+  setStreamingUi({ active: true, kind, message: kind === "workspace" ? "Jarvis analisando o workspace e preparando a resposta..." : "Jarvis escrevendo a resposta..." });
+  return controller;
+}
+
+function cancelActiveStream({ announce = true } = {}) {
+  if (!activeStreamController) return false;
+  const controller = activeStreamController;
+  clearActiveStreamController(controller);
+  try {
+    controller.abort();
+  } catch {
+    // ignore
+  }
+  setStreamingUi({ active: false, tone: "cancelled", message: "Resposta interrompida. O que ja apareceu na tela foi mantido localmente." });
+  if (announce) announceAssistantMessage("Resposta interrompida. Revise o que apareceu e envie o próximo passo quando quiser.");
+  return true;
+}
+
 function setPending(pending) {
   form.querySelector("#send").disabled = pending;
   if (sendCodexButton) sendCodexButton.disabled = pending;
   promptEl.disabled = pending;
   attachFileButton.disabled = pending;
+  if (!pending && !activeStreamController) {
+    setStreamingUi({ active: false });
+  }
 }
 
 async function api(path, options = {}) {
@@ -5492,6 +5658,7 @@ async function streamSessionMessage({ sessionId, model, content, displayContent,
   const assistantBody = assistantNode?.querySelector(".message-body");
   const assistantMeta = assistantNode?.querySelector(".message-meta");
 
+  const streamController = startStreamController("chat");
   const response = await fetch(`/api/chat/sessions/${sessionId}/message/stream`, {
     method: "POST",
     headers: {
@@ -5505,6 +5672,7 @@ async function streamSessionMessage({ sessionId, model, content, displayContent,
       workspace,
       attachments,
     }),
+    signal: streamController.signal,
   });
   if (!response.ok || !response.body) {
     throw new Error(`HTTP ${response.status}`);
@@ -5515,43 +5683,60 @@ async function streamSessionMessage({ sessionId, model, content, displayContent,
   let buffer = "";
   let finalPayload = null;
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const events = buffer.split("\n\n");
-    buffer = events.pop() || "";
-    for (const event of events) {
-      const trimmed = event.trim();
-      if (!trimmed.startsWith("data:")) continue;
-      const payloadText = trimmed.slice(5).trim();
-      if (payloadText === "[DONE]") continue;
-      const payload = JSON.parse(payloadText);
-      if (payload.type === "start") {
-        assistantMessage.metadata = payload.assistant_metadata || null;
-        if (assistantMeta) {
-          const metaLine = formatMessageMetadata(assistantMessage.metadata);
-          if (metaLine) assistantMeta.textContent = metaLine;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+      for (const event of events) {
+        const trimmed = event.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const payloadText = trimmed.slice(5).trim();
+        if (payloadText === "[DONE]") continue;
+        const payload = JSON.parse(payloadText);
+        if (payload.type === "start") {
+          assistantMessage.metadata = payload.assistant_metadata || null;
+          if (assistantMeta) {
+            const metaLine = formatMessageMetadata(assistantMessage.metadata);
+            if (metaLine) assistantMeta.textContent = metaLine;
+          }
+          continue;
         }
-        continue;
-      } else if (payload.type === "chunk") {
-        assistantMessage.content += payload.delta || "";
-        if (assistantBody) {
-          assistantBody.textContent = assistantMessage.content;
-          messagesEl.scrollTop = messagesEl.scrollHeight;
+        if (payload.type === "chunk") {
+          assistantMessage.content += payload.delta || "";
+          if (assistantBody) {
+            assistantBody.textContent = assistantMessage.content;
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+          continue;
         }
-      } else if (payload.type === "done") {
-        finalPayload = payload;
-      } else if (payload.type === "error") {
-        throw new Error(payload.detail || "Erro desconhecido no stream.");
+        if (payload.type === "done") {
+          finalPayload = payload;
+          continue;
+        }
+        if (payload.type === "error") {
+          throw new Error(payload.detail || "Erro desconhecido no stream.");
+        }
       }
     }
-  }
 
-  if (!finalPayload) {
-    throw new Error("Stream finalizado sem payload final.");
+    if (!finalPayload) {
+      throw new Error("Stream finalizado sem payload final.");
+    }
+    setStreamingUi({ active: false, message: "Resposta concluida e salva na sessao." });
+    return finalPayload;
+  } catch (error) {
+    if (isStreamAbortError(error)) {
+      setStreamingUi({ active: false, tone: "cancelled", message: "Resposta interrompida. O texto parcial exibido nao foi persistido." });
+      throw error;
+    }
+    setStreamingUi({ active: false, tone: "error", message: `Falha no streaming: ${error.message}` });
+    throw error;
+  } finally {
+    clearActiveStreamController(streamController);
   }
-  return finalPayload;
 }
 
 async function streamWorkspaceSessionTurn({ sessionId, model, content, displayContent, workspace, path = null, fileContent = null, terminalOutput = null, attachments = [] }) {
@@ -5574,6 +5759,7 @@ async function streamWorkspaceSessionTurn({ sessionId, model, content, displayCo
   const assistantBody = assistantNode?.querySelector(".message-body");
   const assistantMeta = assistantNode?.querySelector(".message-meta");
 
+  const streamController = startStreamController("workspace");
   const response = await fetch(`/api/chat/sessions/${sessionId}/workspace-turn/stream`, {
     method: "POST",
     headers: {
@@ -5592,6 +5778,7 @@ async function streamWorkspaceSessionTurn({ sessionId, model, content, displayCo
       queue_command: true,
       queue_edit: true,
     }),
+    signal: streamController.signal,
   });
   if (!response.ok || !response.body) {
     throw new Error(`HTTP ${response.status}`);
@@ -5603,64 +5790,76 @@ async function streamWorkspaceSessionTurn({ sessionId, model, content, displayCo
   let finalPayload = null;
   let isStreamingBody = false;
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    const events = buffer.split("\n\n");
-    buffer = events.pop() || "";
-    for (const event of events) {
-      const trimmed = event.trim();
-      if (!trimmed.startsWith("data:")) continue;
-      const payloadText = trimmed.slice(5).trim();
-      if (payloadText === "[DONE]") continue;
-      const payload = JSON.parse(payloadText);
-      if (payload.type === "start") {
-        assistantMessage.metadata = payload.assistant_metadata || null;
-        if (assistantMeta) {
-          const metaLine = formatMessageMetadata(assistantMessage.metadata);
-          if (metaLine) assistantMeta.textContent = metaLine;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+      for (const event of events) {
+        const trimmed = event.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        const payloadText = trimmed.slice(5).trim();
+        if (payloadText === "[DONE]") continue;
+        const payload = JSON.parse(payloadText);
+        if (payload.type === "start") {
+          assistantMessage.metadata = payload.assistant_metadata || null;
+          if (assistantMeta) {
+            const metaLine = formatMessageMetadata(assistantMessage.metadata);
+            if (metaLine) assistantMeta.textContent = metaLine;
+          }
+          continue;
         }
-        continue;
-      }
-      if (payload.type === "phase") {
-        const lines = [];
-        if (payload.label) lines.push(payload.label);
-        if (payload.summary) lines.push(payload.summary);
-        if (typeof payload.queued_approvals === "number") lines.push(`Ações em fila: ${payload.queued_approvals}`);
-        assistantMessage.content = `${lines.join("\n")}\n`;
-        if (assistantBody) {
-          assistantBody.textContent = assistantMessage.content;
-          messagesEl.scrollTop = messagesEl.scrollHeight;
+        if (payload.type === "phase") {
+          const lines = [];
+          if (payload.label) lines.push(payload.label);
+          if (payload.summary) lines.push(payload.summary);
+          if (typeof payload.queued_approvals === "number") lines.push(`Ações em fila: ${payload.queued_approvals}`);
+          assistantMessage.content = `${lines.join("\n")}\n`;
+          if (assistantBody) {
+            assistantBody.textContent = assistantMessage.content;
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+          continue;
         }
-        continue;
-      }
-      if (payload.type === "chunk") {
-        if (!isStreamingBody) {
-          assistantMessage.content = "";
-          isStreamingBody = true;
+        if (payload.type === "chunk") {
+          if (!isStreamingBody) {
+            assistantMessage.content = "";
+            isStreamingBody = true;
+          }
+          assistantMessage.content += payload.delta || "";
+          if (assistantBody) {
+            assistantBody.textContent = assistantMessage.content;
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+          }
+          continue;
         }
-        assistantMessage.content += payload.delta || "";
-        if (assistantBody) {
-          assistantBody.textContent = assistantMessage.content;
-          messagesEl.scrollTop = messagesEl.scrollHeight;
+        if (payload.type === "done") {
+          finalPayload = payload;
+          continue;
         }
-        continue;
-      }
-      if (payload.type === "done") {
-        finalPayload = payload;
-        continue;
-      }
-      if (payload.type === "error") {
-        throw new Error(payload.detail || "Erro desconhecido no stream operacional.");
+        if (payload.type === "error") {
+          throw new Error(payload.detail || "Erro desconhecido no stream operacional.");
+        }
       }
     }
-  }
 
-  if (!finalPayload) {
-    throw new Error("Stream operacional finalizado sem payload final.");
+    if (!finalPayload) {
+      throw new Error("Stream operacional finalizado sem payload final.");
+    }
+    setStreamingUi({ active: false, message: "Turno operacional concluido e salvo na sessao." });
+    return finalPayload;
+  } catch (error) {
+    if (isStreamAbortError(error)) {
+      setStreamingUi({ active: false, tone: "cancelled", message: "Turno interrompido. O texto parcial exibido nao foi persistido." });
+      throw error;
+    }
+    setStreamingUi({ active: false, tone: "error", message: `Falha no turno: ${error.message}` });
+    throw error;
+  } finally {
+    clearActiveStreamController(streamController);
   }
-  return finalPayload;
 }
 
 async function registerServiceWorker() {

@@ -137,6 +137,19 @@
             <button id="ask-terminal-context" type="button" class="secondary">Perguntar erro</button>
             <button id="plan-terminal-context" type="button" class="secondary">Virar tarefa</button>
           </div>
+          <div class="terminal-assistant-shell">
+            <div class="terminal-assistant-header">
+              <strong>Assistente do Terminal</strong>
+              <span>Repita o ultimo comando, abra o arquivo citado ou prepare a correcao.</span>
+            </div>
+            <div class="terminal-assistant-actions">
+              <button id="terminal-repeat-last" type="button" class="secondary">Repetir ultimo</button>
+              <button id="terminal-open-mentioned-file" type="button" class="secondary">Abrir arquivo citado</button>
+              <button id="terminal-fix-now" type="button" class="secondary">Corrigir com Jarvis</button>
+              <button id="terminal-task-now" type="button" class="secondary">Virar tarefa</button>
+            </div>
+            <pre id="terminal-assistant-status" class="terminal-assistant-status">Nenhum comando recente ainda.</pre>
+          </div>
           <div class="terminal-help-shell">
             <div class="terminal-help-header">
               <strong>Guia do Terminal</strong>
@@ -458,6 +471,10 @@
           ></textarea>
           <div class="composer-actions">
             <span id="hint">`Chat` conversa. `Jarvis agir` analisa arquivo, terminal e pode enfileirar diff/comando. Shift+Enter cria nova linha.</span>
+            <div class="composer-runtime-shell">
+              <span id="stream-status" class="status-pill stream-status" aria-live="polite">Pronto para conversar.</span>
+              <button id="cancel-stream" type="button" class="secondary danger" disabled>Interromper</button>
+            </div>
             <div class="composer-buttons">
               <button id="export-chat" type="button" class="secondary">Exportar MD</button>
               <button id="send-codex" type="button" class="secondary">Jarvis agir</button>

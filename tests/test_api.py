@@ -601,6 +601,41 @@ def test_workspace_and_terminal_api(tmp_path, monkeypatch):
     assert workspace_session.status_code == 200
     workspace_session_id = workspace_session.json()["session"]["id"]
 
+    standard_message = client.post(
+        f"/api/chat/sessions/{workspace_session_id}/message",
+        json={
+            "model": "jarvis-safe",
+            "content": "Explique o estado atual do projeto.",
+            "display_content": "Explique o estado atual do projeto.",
+            "workspace": "jarvis",
+            "attachments": [{"name": "brief.md", "content": "estado atual", "size": 11}],
+        },
+    )
+    assert standard_message.status_code == 200
+    assert standard_message.json()["message"]
+    assert standard_message.json()["session"]["operations"][-1]["kind"] == "chat_turn"
+    assert standard_message.json()["session"]["turns"][-1]["kind"] == "chat_turn"
+    assert standard_message.json()["session"]["messages"][-2]["attachments"][0]["name"] == "brief.md"
+    assert any(event["type"] == "chat_turn_created" for event in standard_message.json()["session"]["events"])
+
+    streamed_message = client.post(
+        f"/api/chat/sessions/{workspace_session_id}/message/stream",
+        json={
+            "model": "jarvis-safe",
+            "content": "Continue o raciocinio com mais detalhes.",
+            "display_content": "Continue o raciocinio com mais detalhes.",
+            "workspace": "jarvis",
+            "attachments": [],
+        },
+    )
+    assert streamed_message.status_code == 200
+    assert '"type": "start"' in streamed_message.text
+    assert '"type": "done"' in streamed_message.text
+    streamed_message_session = client.get(f"/api/chat/sessions/{workspace_session_id}")
+    assert streamed_message_session.status_code == 200
+    assert streamed_message_session.json()["session"]["turns"][-1]["kind"] == "chat_turn"
+    assert streamed_message_session.json()["session"]["operations"][-1]["kind"] == "chat_turn"
+
     workspace_turn = client.post(
         f"/api/chat/sessions/{workspace_session_id}/workspace-turn",
         json={
