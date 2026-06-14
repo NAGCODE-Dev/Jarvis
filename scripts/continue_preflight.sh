@@ -2,14 +2,20 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+eval "$($ROOT_DIR/scripts/_runtime_env.sh "$ROOT_DIR")"
 GLOBAL_CONTINUE_CONFIG="${HOME}/.continue/config.yaml"
 PROJECT_CONTINUE_CONFIG="$ROOT_DIR/config/continue/config.yaml"
 HOST="${JARVIS_HOST:-127.0.0.1}"
 PORT="${JARVIS_PORT:-8000}"
 STATUS_URL="http://${HOST}:${PORT}/api/status"
 
+RUNTIME_CONTINUE_DIR="$JARVIS_RUNTIME_HOME/continue"
+mkdir -p "$RUNTIME_CONTINUE_DIR"
+
 echo "[jarvis] Continue preflight"
 echo
+
+echo "[jarvis] Runtime continue dir: $RUNTIME_CONTINUE_DIR"
 
 if [ -f "$GLOBAL_CONTINUE_CONFIG" ]; then
   echo "[ok] Continue global config found: $GLOBAL_CONTINUE_CONFIG"
@@ -24,10 +30,10 @@ else
 fi
 
 if command -v curl >/dev/null 2>&1; then
-  if curl -fsS "$STATUS_URL" >/tmp/jarvis-continue-status.json 2>/dev/null; then
+  if curl -fsS "$STATUS_URL" >"$RUNTIME_CONTINUE_DIR/status.json" 2>/dev/null; then
     echo "[ok] Jarvis core reachable at $STATUS_URL"
-    cat /tmp/jarvis-continue-status.json
-    rm -f /tmp/jarvis-continue-status.json
+    cat "$RUNTIME_CONTINUE_DIR/status.json"
+    rm -f "$RUNTIME_CONTINUE_DIR/status.json"
   else
     echo "[warn] Jarvis core not reachable at $STATUS_URL"
     echo "       Start it with: scripts/run_core.sh"
@@ -46,7 +52,7 @@ echo
 echo "[jarvis] Recommended VS Code test flow"
 echo "1. Run: scripts/run_core.sh"
 echo "2. In another terminal run: scripts/continue_preflight.sh"
-echo "3. Open this folder in VS Code: code \"$ROOT_DIR\""
+echo "3. Open this folder in VS Code: code "$ROOT_DIR""
 echo "4. Reload window in VS Code: Ctrl+Shift+P -> Developer: Reload Window"
 echo "5. Open Continue and select:"
 echo "   - Jarvis Programador Quality"

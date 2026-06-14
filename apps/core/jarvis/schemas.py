@@ -100,6 +100,11 @@ class SessionUiStateRequest(BaseModel):
     editor_instruction: str | None = None
     terminal_command: str | None = None
     workbench_mode: str | None = None
+    terminal_tail: str | None = None
+    pending_attachments: list[SessionAttachmentRequest] = Field(default_factory=list)
+    pending_edit_proposal: dict[str, Any] | None = None
+    pending_batch_proposal: dict[str, Any] | None = None
+    pending_task_assist: dict[str, Any] | None = None
 
 
 class SessionMetaRequest(BaseModel):
@@ -157,6 +162,19 @@ class SessionMessageRequest(BaseModel):
     display_content: str | None = None
     workspace: str | None = None
     temperature: float | None = None
+    attachments: list[SessionAttachmentRequest] | None = None
+
+
+class SessionWorkspaceTurnRequest(BaseModel):
+    model: str
+    content: str
+    display_content: str | None = None
+    workspace: str | None = None
+    path: str | None = None
+    file_content: str | None = None
+    terminal_output: str | None = None
+    queue_command: bool = True
+    queue_edit: bool = True
     attachments: list[SessionAttachmentRequest] | None = None
 
 

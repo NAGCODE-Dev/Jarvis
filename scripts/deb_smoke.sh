@@ -3,7 +3,7 @@ set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 "$ROOT_DIR/scripts/build_deb.sh" >/dev/null
-PACKAGE=$(ls -1 "$ROOT_DIR"/dist/jarvis-local_*.deb | tail -n 1)
+PACKAGE=$(ls -1t "$ROOT_DIR"/dist/jarvis-local_*.deb | head -n 1)
 TMP_DIR=$(mktemp -d)
 cleanup() {
   rm -rf "$TMP_DIR"
@@ -24,5 +24,7 @@ tar -tf "$DATA_ARCHIVE" | grep -F './usr/bin/jarvis-local' >/dev/null
 tar -tf "$DATA_ARCHIVE" | grep -F './usr/share/applications/jarvis-local.desktop' >/dev/null
 tar -tf "$DATA_ARCHIVE" | grep -F './opt/jarvis-local/app/scripts/run_linux_app.sh' >/dev/null
 tar -tf "$CONTROL_ARCHIVE" | grep -F './control' >/dev/null
+tar -tf "$CONTROL_ARCHIVE" | grep -F './postinst' >/dev/null
+tar -tf "$CONTROL_ARCHIVE" | grep -F './prerm' >/dev/null
 
 echo "[jarvis-deb] smoke ok: $PACKAGE"

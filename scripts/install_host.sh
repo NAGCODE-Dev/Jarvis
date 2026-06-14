@@ -2,7 +2,9 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-VENV_DIR="$ROOT_DIR/.venv"
+eval "$($ROOT_DIR/scripts/_runtime_env.sh "$ROOT_DIR")"
+VENV_DIR="$JARVIS_VENV_DIR"
+ENV_FILE="$JARVIS_ENV_FILE"
 
 echo "[jarvis] Installing Ubuntu dependencies"
 if command -v sudo >/dev/null 2>&1; then
@@ -12,15 +14,7 @@ else
 fi
 
 $SUDO apt-get update
-$SUDO apt-get install -y \
-  python3-venv \
-  python3-pip \
-  curl \
-  ca-certificates \
-  build-essential \
-  git \
-  poppler-utils \
-  libreoffice-common
+$SUDO apt-get install -y   python3-venv   python3-pip   curl   ca-certificates   build-essential   git   poppler-utils   libreoffice-common
 
 if ! command -v docker >/dev/null 2>&1; then
   echo "[jarvis] Installing Docker"
@@ -32,13 +26,14 @@ if ! command -v ollama >/dev/null 2>&1; then
   curl -fsSL https://ollama.com/install.sh | sh
 fi
 
-echo "[jarvis] Creating Python virtual environment"
+echo "[jarvis] Creating Python virtual environment at $VENV_DIR"
+mkdir -p "$(dirname "$VENV_DIR")" "$(dirname "$ENV_FILE")"
 python3 -m venv "$VENV_DIR"
 "$VENV_DIR/bin/pip" install --upgrade pip
 "$VENV_DIR/bin/pip" install -e "$ROOT_DIR[dev]"
 
-if [ ! -f "$ROOT_DIR/.env" ]; then
-  cp "$ROOT_DIR/config/.env.example" "$ROOT_DIR/.env"
+if [ ! -f "$ENV_FILE" ]; then
+  cp "$ROOT_DIR/config/.env.example" "$ENV_FILE"
 fi
 
 "$ROOT_DIR/scripts/apply_quality_profile.sh"

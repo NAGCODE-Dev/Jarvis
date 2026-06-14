@@ -61,6 +61,15 @@ def test_linux_app_files_exist():
     deb_builder = ROOT / "scripts" / "build_deb.sh"
     deb_smoke = ROOT / "scripts" / "deb_smoke.sh"
     deb_installer = ROOT / "scripts" / "install_deb_local.sh"
+    package_doctor = ROOT / "scripts" / "package_doctor.sh"
+    package_setup = ROOT / "scripts" / "package_setup.sh"
+    runtime_env = ROOT / "scripts" / "_runtime_env.sh"
+    package_help = ROOT / "apps" / "linux" / "package_help.html"
+    debian_dir = ROOT / "packaging" / "debian"
+    debian_control = debian_dir / "control.in"
+    debian_postinst = debian_dir / "postinst"
+    debian_prerm = debian_dir / "prerm"
+    debian_desktop = debian_dir / "jarvis-local.desktop.in"
 
     assert desktop_template.exists()
     assert canonical_launcher.exists()
@@ -69,6 +78,14 @@ def test_linux_app_files_exist():
     assert deb_builder.exists()
     assert deb_smoke.exists()
     assert deb_installer.exists()
+    assert package_doctor.exists()
+    assert package_setup.exists()
+    assert runtime_env.exists()
+    assert package_help.exists()
+    assert debian_control.exists()
+    assert debian_postinst.exists()
+    assert debian_prerm.exists()
+    assert debian_desktop.exists()
 
     desktop_text = desktop_template.read_text(encoding="utf-8")
     canonical_launcher_text = canonical_launcher.read_text(encoding="utf-8")
@@ -76,19 +93,52 @@ def test_linux_app_files_exist():
     installer_text = installer.read_text(encoding="utf-8")
     deb_builder_text = deb_builder.read_text(encoding="utf-8")
     deb_installer_text = deb_installer.read_text(encoding="utf-8")
+    package_doctor_text = package_doctor.read_text(encoding="utf-8")
+    package_setup_text = package_setup.read_text(encoding="utf-8")
+    runtime_env_text = runtime_env.read_text(encoding="utf-8")
+    package_help_text = package_help.read_text(encoding="utf-8")
+    debian_control_text = debian_control.read_text(encoding="utf-8")
+    debian_postinst_text = debian_postinst.read_text(encoding="utf-8")
+    debian_prerm_text = debian_prerm.read_text(encoding="utf-8")
+    debian_desktop_text = debian_desktop.read_text(encoding="utf-8")
 
     assert "Name=Jarvis Local" in desktop_text
     assert "scripts/run_linux_app.sh" in desktop_text
     assert "scripts/jarvis.sh" in launcher_text
+    assert "package_doctor.sh" in launcher_text
+    assert "package_help.html" in launcher_text
     assert '--app="$APP_URL"' in launcher_text
     assert "scripts/jarvis.sh" in canonical_launcher_text
+    assert "scripts/package_doctor.sh" in canonical_launcher_text
+    assert "scripts/package_setup.sh" in canonical_launcher_text
     assert "run_cli_chat chat jarvis-safe" in canonical_launcher_text
+
+    continue_preflight_text = (ROOT / "scripts" / "continue_preflight.sh").read_text(encoding="utf-8")
+    continue_smoke_text = (ROOT / "scripts" / "continue_smoke.sh").read_text(encoding="utf-8")
     assert "jarvis-local.desktop" in installer_text
     assert "Jarvis Local" in installer_text
     assert "/opt/jarvis-local/app" in deb_builder_text
+    assert "DEBIAN" in deb_builder_text
+    assert "packaging/debian" in deb_builder_text
     assert "scripts/jarvis.sh app" in deb_builder_text
     assert "OUTPUT_PATH" in deb_builder_text
+    assert "postinst" in deb_builder_text
+    assert "prerm" in deb_builder_text
     assert "dpkg -i" in deb_installer_text
+    assert "Package: @PACKAGE_NAME@" in debian_control_text
+    assert "Architecture: @ARCH@" in debian_control_text
+    assert "update-desktop-database" in debian_postinst_text
+    assert "update-desktop-database" in debian_prerm_text
+    assert "Exec=/usr/bin/jarvis-local" in debian_desktop_text
+    assert "python operacional" in package_doctor_text
+    assert "JARVIS_VENV_DIR" in package_doctor_text
+    assert "setup-local" in package_setup_text
+    assert "JARVIS_RUNTIME_HOME/continue" in continue_preflight_text
+    assert "JARVIS_RUNTIME_HOME/continue-smoke" in continue_smoke_text
+    assert "JARVIS_ENV_FILE" in runtime_env_text
+    assert "JARVIS_DATA_DIR" in runtime_env_text
+    assert "Jarvis Local não conseguiu iniciar automaticamente" in package_help_text
+    assert "setup-local" in package_help_text
 
 
 def test_canonical_chat_wrappers_delegate_to_jarvis_launcher():
@@ -107,6 +157,25 @@ def test_canonical_chat_wrappers_delegate_to_jarvis_launcher():
     assert 'scripts/jarvis.sh" repl' in chat_repl_wrapper
     assert 'scripts/jarvis.sh" code-repl' in code_repl_wrapper
     assert 'scripts/jarvis.sh" research-repl' in research_repl_wrapper
+
+
+def test_cli_wrappers_use_runtime_aware_python_resolution():
+    wrapper_paths = [
+        ROOT / "scripts" / "index_knowledge.sh",
+        ROOT / "scripts" / "benchmark_models.sh",
+        ROOT / "scripts" / "memory_action.sh",
+        ROOT / "scripts" / "show_context.sh",
+        ROOT / "scripts" / "smoke_test.sh",
+        ROOT / "scripts" / "obsidian_sync_dir.sh",
+        ROOT / "scripts" / "obsidian_sync_note.sh",
+        ROOT / "scripts" / "obsidian_remember_note.sh",
+    ]
+
+    for wrapper in wrapper_paths:
+        content = wrapper.read_text(encoding="utf-8")
+        assert 'scripts/_ensure_python_env.sh' in content
+        assert 'scripts/_resolve_python.sh' in content
+        assert 'PYTHONPATH="$ROOT_DIR/apps/core"' in content
 
 
 def test_pwa_contains_session_management_controls():
@@ -181,6 +250,7 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "CONTEXT_PREFS_KEY" in js
     assert 'id="session-search"' in html
     assert 'id="export-chat"' in html
+    assert 'id="send-codex"' in html
     assert "normalizeSessionMeta" in js
     assert "setSessionFilter" in js
     assert "toggleCurrentSessionMeta" in js
@@ -294,6 +364,11 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "renderTaskAssist" in js
     assert "renderBatchProposal" in js
     assert "handleSlashCommand" in js
+    assert "submitWorkspaceChatPrompt" in js
+    assert "scheduleTerminalSnapshotSave" in js
+    assert "pending_attachments" in js
+    assert "pending_task_assist" in js
+    assert "terminal_tail" in js
     assert "rememberCurrentNote" in js
     assert "indexCurrentNote" in js
     assert "prepareChatFromCurrentNote" in js
@@ -308,6 +383,7 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "preparePromptForTerminalDebug" in js
     assert "preparePromptForCreateFile" in js
     assert "preparePromptForNextStep" in js
+    assert "/delegate -> usa o prompt atual para gerar diff/comando e enfileirar acoes" in js
     assert "buildMissionModel" in js
     assert "buildMissionActions" in js
     assert "buildMissionBriefingText" in js
@@ -377,6 +453,7 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert '"/queue-edit"' in js
     assert '"/self-review"' in js
     assert "/api/chat/sessions/${currentSessionId}/approvals" in js
+    assert "/api/chat/sessions/${sessionId}/workspace-turn" in js
     assert "saveAllEditors" in js
     assert "attachOpenTabsToChat" in js
     assert "runEditorSelectionInTerminal" in js

@@ -37,6 +37,7 @@ class SessionStore:
                     "active_tasks": len([task for task in (payload.get("tasks") or []) if task.get("status") != "done"]),
                     "active_file": (payload.get("ui_state") or {}).get("active_file") or "",
                     "checkpoint_count": len(payload.get("checkpoints") or []),
+                    "turn_count": len(payload.get("turns") or []),
                     "message_count": len(payload.get("messages") or []),
                     "preview": self._session_preview(payload),
                     "meta": meta,
@@ -74,6 +75,7 @@ class SessionStore:
             "tasks": [],
             "events": [],
             "checkpoints": [],
+            "turns": [],
         }
         self._write(self._path(session_id), payload)
         return payload
@@ -236,6 +238,65 @@ class SessionStore:
         session["events"] = events[-200:]
         return self.save_session(session_id, session)
 
+    def append_turn(
+        self,
+        session_id: str,
+        *,
+        kind: str,
+        title: str,
+        summary: str | None = None,
+        path: str | None = None,
+        workspace: str | None = None,
+        model: str | None = None,
+        user_prompt: str | None = None,
+        suggested_command: str | None = None,
+        edit_instruction: str | None = None,
+        approvals: list[dict] | None = None,
+        task_assist: dict | None = None,
+        snapshot: dict | None = None,
+        metadata: dict | None = None,
+    ) -> tuple[dict, dict]:
+        session = self.get_session(session_id)
+        turn = {
+            "id": uuid4().hex,
+            "kind": kind,
+            "title": title,
+            "summary": summary,
+            "path": path,
+            "workspace": workspace,
+            "model": model,
+            "user_prompt": (user_prompt or "")[:20_000] or None,
+            "suggested_command": (suggested_command or "")[:4000] or None,
+            "edit_instruction": (edit_instruction or "")[:4000] or None,
+            "approvals": self._normalize_turn_approvals(approvals),
+            "task_assist": self._normalize_task_assist(task_assist),
+            "metadata": self._normalize_turn_metadata(metadata),
+            "snapshot": self._normalize_turn_snapshot(snapshot),
+            "created_at": _now_iso(),
+        }
+        turns = session.setdefault("turns", [])
+        turns.append(turn)
+        session["turns"] = turns[-120:]
+        updated = self.save_session(session_id, session)
+        return updated, turn
+
+    def restore_turn(self, session_id: str, turn_id: str) -> tuple[dict, dict]:
+        session = self.get_session(session_id)
+        turns = session.setdefault("turns", [])
+        for turn in turns:
+            if turn.get("id") != turn_id:
+                continue
+            snapshot = turn.get("snapshot") or {}
+            if "ui_state" in snapshot:
+                session["ui_state"] = self._normalize_ui_state(snapshot.get("ui_state") or None)
+            if "mission" in snapshot:
+                session["mission"] = self._normalize_mission(snapshot.get("mission") or None)
+            if "workspace" in snapshot:
+                session["workspace"] = snapshot.get("workspace")
+            updated = self.save_session(session_id, session)
+            return updated, turn
+        raise FileNotFoundError(f"Turn not found: {turn_id}")
+
     def create_checkpoint(
         self,
         session_id: str,
@@ -377,6 +438,131 @@ class SessionStore:
                 break
         return normalized
 
+    def _normalize_terminal_tail(self, content: object) -> str | None:
+        text = str(content or "").strip()
+        if not text:
+            return None
+        return text[-12_000:]
+
+    def _normalize_edit_proposal(self, proposal: dict | None) -> dict | None:
+        if not isinstance(proposal, dict):
+            return None
+        path = str(proposal.get("path") or "").strip()
+        proposed_content = proposal.get("proposed_content")
+        if not path or not isinstance(proposed_content, str):
+            return None
+        hunks = []
+        for item in proposal.get("hunks") or []:
+            if not isinstance(item, dict):
+                continue
+            hunks.append(
+                {
+                    "index": int(item.get("index") or 0),
+                    "tag": str(item.get("tag") or "replace"),
+                    "original_start": int(item.get("original_start") or 0),
+                    "original_end": int(item.get("original_end") or 0),
+                    "proposed_start": int(item.get("proposed_start") or 0),
+                    "proposed_end": int(item.get("proposed_end") or 0),
+                    "original_lines": [str(line)[:500] for line in (item.get("original_lines") or [])][:80],
+                    "proposed_lines": [str(line)[:500] for line in (item.get("proposed_lines") or [])][:80],
+                    "preview": str(item.get("preview") or "")[:12_000],
+                    "applied": bool(item.get("applied")),
+                }
+            )
+            if len(hunks) >= 40:
+                break
+        return {
+            "path": path,
+            "instruction": str(proposal.get("instruction") or "")[:4000] or None,
+            "proposed_content": proposed_content[:120_000],
+            "diff": str(proposal.get("diff") or "")[:40_000],
+            "hunks": hunks,
+        }
+
+    def _normalize_batch_proposal(self, proposal: dict | None) -> dict | None:
+        if not isinstance(proposal, dict):
+            return None
+        proposals = []
+        for item in proposal.get("proposals") or []:
+            normalized = self._normalize_edit_proposal(item)
+            if not normalized:
+                continue
+            normalized["applied"] = bool(item.get("applied"))
+            proposals.append(normalized)
+            if len(proposals) >= 20:
+                break
+        if not proposals and not str(proposal.get("summary") or "").strip():
+            return None
+        return {
+            "summary": str(proposal.get("summary") or "")[:4000],
+            "applied": bool(proposal.get("applied")),
+            "proposals": proposals,
+        }
+
+    def _normalize_task_assist(self, task_assist: dict | None) -> dict | None:
+        if not isinstance(task_assist, dict):
+            return None
+        summary = str(task_assist.get("summary") or "").strip()
+        suggested_command = str(task_assist.get("suggested_command") or "").strip()
+        edit_instruction = str(task_assist.get("edit_instruction") or "").strip()
+        initial = task_assist.get("initial") if isinstance(task_assist.get("initial"), dict) else None
+        command_result = task_assist.get("command_result") if isinstance(task_assist.get("command_result"), dict) else None
+        normalized = {
+            "summary": summary[:4000] or None,
+            "suggested_command": suggested_command[:4000] or None,
+            "edit_instruction": edit_instruction[:4000] or None,
+            "mode": str(task_assist.get("mode") or "")[:80] or None,
+            "edit_proposal": self._normalize_edit_proposal(task_assist.get("edit_proposal")),
+            "initial": {
+                "summary": str(initial.get("summary") or "")[:4000] or None,
+                "suggested_command": str(initial.get("suggested_command") or "")[:4000] or None,
+            } if initial else None,
+            "command_result": {
+                "command": str(command_result.get("command") or "")[:4000] or None,
+                "exit_code": command_result.get("exit_code"),
+                "output": str(command_result.get("output") or "")[-12_000:] or None,
+            } if command_result else None,
+        }
+        if not any(normalized.values()):
+            return None
+        return normalized
+
+    def _normalize_turn_approvals(self, approvals: list[dict] | None) -> list[dict]:
+        normalized = []
+        for item in approvals or []:
+            if not isinstance(item, dict):
+                continue
+            normalized.append(
+                {
+                    "id": str(item.get("id") or "")[:80] or None,
+                    "kind": str(item.get("kind") or "")[:80] or None,
+                    "title": str(item.get("title") or "")[:240] or None,
+                    "path": str(item.get("path") or "")[:500] or None,
+                    "command": str(item.get("command") or "")[:2000] or None,
+                    "status": str(item.get("status") or "pending")[:40],
+                }
+            )
+            if len(normalized) >= 12:
+                break
+        return normalized
+
+    def _normalize_turn_metadata(self, metadata: dict | None) -> dict:
+        payload = dict(metadata or {})
+        return {
+            "queued_approvals": int(payload.get("queued_approvals") or 0),
+            "route_kind": str(payload.get("route_kind") or "")[:80] or None,
+            "effective_agent": str(payload.get("effective_agent") or "")[:120] or None,
+            "workspace_turn": bool(payload.get("workspace_turn")),
+        }
+
+    def _normalize_turn_snapshot(self, snapshot: dict | None) -> dict:
+        payload = dict(snapshot or {})
+        return {
+            "ui_state": self._normalize_ui_state(payload.get("ui_state") or None),
+            "mission": self._normalize_mission(payload.get("mission") or None),
+            "workspace": payload.get("workspace"),
+        }
+
     def _normalize_meta(self, meta: dict | None) -> dict:
         payload = dict(meta or {})
         return {
@@ -411,6 +597,11 @@ class SessionStore:
             "editor_instruction": payload.get("editor_instruction"),
             "terminal_command": payload.get("terminal_command"),
             "workbench_mode": payload.get("workbench_mode"),
+            "terminal_tail": self._normalize_terminal_tail(payload.get("terminal_tail")),
+            "pending_attachments": self._normalize_attachments(payload.get("pending_attachments")),
+            "pending_edit_proposal": self._normalize_edit_proposal(payload.get("pending_edit_proposal")),
+            "pending_batch_proposal": self._normalize_batch_proposal(payload.get("pending_batch_proposal")),
+            "pending_task_assist": self._normalize_task_assist(payload.get("pending_task_assist")),
             "updated_at": _now_iso(),
         }
 

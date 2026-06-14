@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Jarvis Local - Recuperação</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        background: #0d1713;
+        color: #e6f3ea;
+      }
+      main {
+        max-width: 860px;
+        margin: 0 auto;
+        padding: 40px 20px 72px;
+      }
+      h1, h2 { margin: 0 0 12px; }
+      p, li { line-height: 1.6; }
+      code, pre {
+        font-family: "IBM Plex Mono", monospace;
+        background: rgba(255,255,255,0.06);
+        border-radius: 8px;
+      }
+      code { padding: 2px 6px; }
+      pre {
+        padding: 14px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+      .card {
+        border: 1px solid rgba(139, 211, 168, 0.24);
+        border-radius: 14px;
+        padding: 18px;
+        margin-top: 18px;
+        background: rgba(255,255,255,0.03);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Jarvis Local não conseguiu iniciar automaticamente</h1>
+      <p>O launcher Debian foi aberto, mas o core local não ficou saudável a tempo. O sistema continua recuperável em modo local.</p>
+
+      <div class="card">
+        <h2>Passo 1: rodar o diagnóstico</h2>
+        <pre><code>/opt/jarvis-local/app/scripts/jarvis.sh setup-local --dry-run
+/opt/jarvis-local/app/scripts/jarvis.sh setup-local
+/opt/jarvis-local/app/scripts/jarvis.sh doctor</code></pre>
+      </div>
+
+      <div class="card">
+        <h2>Passo 2: preparar o runtime local</h2>
+        <pre><code>/opt/jarvis-local/app/scripts/jarvis.sh setup-local --dry-run
+/opt/jarvis-local/app/scripts/jarvis.sh setup-local
+# opcional:
+/opt/jarvis-local/app/scripts/jarvis.sh setup-local --with-infra --with-models</code></pre>
+      </div>
+
+      <div class="card">
+        <h2>Passo 3: tentar subir manualmente</h2>
+        <pre><code>/opt/jarvis-local/app/scripts/jarvis.sh boot --no-seed
+/opt/jarvis-local/app/scripts/jarvis.sh status</code></pre>
+      </div>
+
+      <div class="card">
+        <h2>Se faltarem dependências Python</h2>
+        <pre><code>/opt/jarvis-local/app/scripts/jarvis.sh setup-local
+# ou, se quiser o setup completo:
+/opt/jarvis-local/app/scripts/jarvis.sh setup-local --with-infra --with-models</code></pre>
+      </div>
+
+      <div class="card">
+        <h2>Verificação final</h2>
+        <pre><code>/opt/jarvis-local/app/scripts/verify_local.sh
+xdg-open http://127.0.0.1:8000/app/</code></pre>
+      </div>
+    </main>
+  </body>
+</html>

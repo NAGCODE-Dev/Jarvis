@@ -2,7 +2,8 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-PID_FILE="$ROOT_DIR/logs/jarvis-core.pid"
+eval "$($ROOT_DIR/scripts/_runtime_env.sh "$ROOT_DIR")"
+PID_FILE="$JARVIS_LOG_DIR/jarvis-core.pid"
 HOST="${JARVIS_HOST:-127.0.0.1}"
 PORT="${JARVIS_PORT:-8000}"
 stopped=0

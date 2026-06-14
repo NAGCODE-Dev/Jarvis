@@ -43,6 +43,7 @@ const sessionFilterButtons = Array.from(document.querySelectorAll(".session-filt
 const pinSessionButton = document.querySelector("#pin-session");
 const archiveSessionButton = document.querySelector("#archive-session");
 const exportChatButton = document.querySelector("#export-chat");
+const sendCodexButton = document.querySelector("#send-codex");
 const promptActiveFileButton = document.querySelector("#prompt-active-file");
 const promptTerminalDebugButton = document.querySelector("#prompt-terminal-debug");
 const promptCreateFileButton = document.querySelector("#prompt-create-file");
@@ -196,6 +197,78 @@ let currentTimelineFilter = "all";
 let workbenchMode = "chat";
 let quickFlowMode = "create";
 let commandPaletteOpen = false;
+let terminalUiStateSaveTimer = null;
+
+function truncateTail(content, limit = 12000) {
+  const text = String(content || "");
+  if (text.length <= limit) return text;
+  return text.slice(-limit);
+}
+
+function buildPersistableEditProposal(proposal) {
+  if (!proposal || !proposal.path || typeof proposal.proposed_content !== "string") return null;
+  return {
+    path: proposal.path,
+    instruction: proposal.instruction || null,
+    proposed_content: proposal.proposed_content,
+    diff: proposal.diff || "",
+    hunks: Array.isArray(proposal.hunks) ? proposal.hunks : [],
+  };
+}
+
+function buildPersistableBatchProposal(proposal) {
+  if (!proposal?.proposals?.length && !(proposal?.summary || "").trim()) return null;
+  return {
+    summary: proposal.summary || "",
+    applied: Boolean(proposal.applied),
+    proposals: Array.isArray(proposal.proposals)
+      ? proposal.proposals
+          .map((item) => ({
+            ...(buildPersistableEditProposal(item) || {}),
+            applied: Boolean(item?.applied),
+          }))
+          .filter((item) => item.path && typeof item.proposed_content === "string")
+      : [],
+  };
+}
+
+function buildPersistableTaskAssist(taskAssist) {
+  if (!taskAssist) return null;
+  return {
+    summary: taskAssist.summary || null,
+    suggested_command: taskAssist.suggested_command || null,
+    edit_instruction: taskAssist.edit_instruction || null,
+    mode: taskAssist.mode || null,
+    edit_proposal: buildPersistableEditProposal(taskAssist.edit_proposal),
+    initial: taskAssist.initial
+      ? {
+          summary: taskAssist.initial.summary || null,
+          suggested_command: taskAssist.initial.suggested_command || null,
+        }
+      : null,
+    command_result: taskAssist.command_result
+      ? {
+          command: taskAssist.command_result.command || null,
+          exit_code: taskAssist.command_result.exit_code ?? null,
+          output: truncateTail(taskAssist.command_result.output || "", 12000) || null,
+        }
+      : null,
+  };
+}
+
+function scheduleTerminalSnapshotSave() {
+  if (!currentSessionId || restoringSessionUiState) return;
+  if (terminalUiStateSaveTimer) {
+    window.clearTimeout(terminalUiStateSaveTimer);
+  }
+  terminalUiStateSaveTimer = window.setTimeout(() => {
+    terminalUiStateSaveTimer = null;
+    persistSessionUiState().catch((error) => {
+      console.warn("jarvis terminal snapshot persist failed", error);
+    });
+  }, 900);
+}
+
 let commandPaletteIndex = 0;
 let commandPaletteItems = [];
 const STORAGE_KEY = "jarvis-pwa-current-session-id";
@@ -240,6 +313,7 @@ const SLASH_COMMANDS = [
   { label: "/debug-terminal", mode: "run", value: "/debug-terminal" },
   { label: "/queue-command", mode: "run", value: "/queue-command" },
   { label: "/queue-edit", mode: "run", value: "/queue-edit" },
+  { label: "/delegate", mode: "run", value: "/delegate" },
   { label: "/self-review", mode: "run", value: "/self-review" },
   { label: "/focus terminal", mode: "run", value: "/focus terminal" },
 ];
@@ -1342,8 +1416,7 @@ for (const button of quickActionButtons) {
   });
 }
 
-form.addEventListener("submit", async (event) => {
-  event.preventDefault();
+async function submitStandardChatPrompt() {
   const prompt = promptEl.value.trim();
   if (!prompt || !currentSessionId) return;
 
@@ -1358,18 +1431,19 @@ form.addEventListener("submit", async (event) => {
   setPending(true);
   try {
     const attachmentPrompt = buildAttachmentPrompt(prompt);
+    const attachments = pendingAttachments.map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      content: attachment.content,
+      size: attachment.size,
+    }));
     const response = await streamSessionMessage({
       sessionId: currentSessionId,
       model: modelSelect.value,
       content: attachmentPrompt,
       displayContent: prompt,
       workspace: workspaceInput.value.trim() || null,
-      attachments: pendingAttachments.map((attachment) => ({
-        id: attachment.id,
-        name: attachment.name,
-        content: attachment.content,
-        size: attachment.size,
-      })),
+      attachments,
     });
     promptEl.value = "";
     pendingAttachments = [];
@@ -1387,7 +1461,102 @@ form.addEventListener("submit", async (event) => {
     setPending(false);
     loadStatus();
   }
+}
+
+async function submitWorkspaceChatPrompt() {
+  const prompt = promptEl.value.trim();
+  if (!prompt || !currentSessionId) return;
+
+  if (prompt.startsWith("/")) {
+    const handled = await handleSlashCommand(prompt);
+    if (handled) {
+      promptEl.value = "";
+      return;
+    }
+  }
+
+  setPending(true);
+  try {
+    const config = resolveQuickFlowConfig();
+    let active = getCurrentEditor();
+    let targetPath = active?.path || resolveQuickTargetPath() || null;
+    if (!active && targetPath) {
+      await ensureWorkspaceFile(targetPath);
+      active = getCurrentEditor();
+    }
+    if (!active && config.targetRequired && !getRecentTerminalExcerpt()) {
+      announceAssistantMessage("Abra um arquivo ou defina um alvo no fluxo rápido antes de mandar o Jarvis agir.");
+      return;
+    }
+
+    const attachmentPrompt = buildAttachmentPrompt(prompt);
+    const attachments = pendingAttachments.map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      content: attachment.content,
+      size: attachment.size,
+    }));
+    const payload = await runWorkspaceSessionTurn({
+      sessionId: currentSessionId,
+      model: modelSelect.value,
+      content: attachmentPrompt,
+      displayContent: prompt,
+      workspace: workspaceInput.value.trim() || null,
+      path: active?.path || targetPath,
+      fileContent: active?.content || null,
+      terminalOutput: getRecentTerminalExcerpt() || null,
+      attachments,
+    });
+
+    pendingTaskAssist = payload.task_assist || null;
+    if (payload.task_assist?.edit_proposal) {
+      pendingEditProposal = {
+        ...payload.task_assist.edit_proposal,
+        hunks: (payload.task_assist.edit_proposal.hunks || []).map((hunk) => ({ ...hunk, applied: false })),
+      };
+    } else {
+      pendingEditProposal = null;
+    }
+    promptEl.value = "";
+    pendingAttachments = [];
+    renderAttachments();
+    stopSessionReplay({ render: false });
+    messages = payload.session?.messages || [];
+    currentApprovals = payload.session?.approvals || [];
+    currentSessionOperations = payload.session?.operations || [];
+    currentEvents = payload.session?.events || [];
+    renderMessages();
+    renderTaskAssist();
+    renderEditProposal();
+    renderApprovals();
+    renderSessionOperations();
+    renderEventStream();
+    await loadCurrentSessionOperations();
+    if ((active?.path || targetPath) && payload.approvals?.length) {
+      setWorkbenchMode("review");
+    } else if (active?.path || targetPath) {
+      setWorkbenchMode("build");
+    }
+    await loadSessions();
+  } catch (error) {
+    stopSessionReplay({ render: false });
+    appendMessageElement("assistant", `Erro ao executar o fluxo operacional do Jarvis: ${error.message}`);
+  } finally {
+    setPending(false);
+    loadStatus();
+  }
+}
+
+form.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await submitStandardChatPrompt();
 });
+
+if (sendCodexButton) {
+  sendCodexButton.addEventListener("click", async () => {
+    await submitWorkspaceChatPrompt();
+  });
+}
 
 promptEl.addEventListener("input", () => {
   scheduleSessionUiStateSave();
@@ -1687,6 +1856,16 @@ function buildSessionUiStateSnapshot() {
     editor_instruction: (editorInstructionEl?.value || "").trim() || null,
     terminal_command: (terminalCommandEl?.value || "").trim() || null,
     workbench_mode: workbenchMode || null,
+    terminal_tail: truncateTail(terminalBuffer, 12000) || null,
+    pending_attachments: pendingAttachments.map((attachment) => ({
+      id: attachment.id,
+      name: attachment.name,
+      content: attachment.content,
+      size: attachment.size,
+    })),
+    pending_edit_proposal: buildPersistableEditProposal(pendingEditProposal),
+    pending_batch_proposal: buildPersistableBatchProposal(pendingBatchProposal),
+    pending_task_assist: buildPersistableTaskAssist(pendingTaskAssist),
   };
 }
 
@@ -1696,12 +1875,16 @@ function clearSessionWorkspaceState() {
   pendingEditProposal = null;
   pendingBatchProposal = null;
   pendingTaskAssist = null;
+  pendingAttachments = [];
   editorSelection = null;
   fileEditorEl.value = "";
   editorInstructionEl.value = "";
+  terminalBuffer = "";
+  renderAttachments();
   renderEditorTabs();
   syncEditorFromState();
   renderWorkspaceTree();
+  renderTerminal();
 }
 
 async function persistSessionUiState() {
@@ -1739,6 +1922,14 @@ async function restoreSessionUiState(session) {
     promptEl.value = uiState.draft_prompt || "";
     editorInstructionEl.value = uiState.editor_instruction || "";
     terminalCommandEl.value = uiState.terminal_command || "";
+    pendingAttachments = Array.isArray(uiState.pending_attachments) ? uiState.pending_attachments.map((attachment) => ({ ...attachment })) : [];
+    pendingEditProposal = uiState.pending_edit_proposal ? { ...uiState.pending_edit_proposal } : null;
+    pendingBatchProposal = uiState.pending_batch_proposal ? { ...uiState.pending_batch_proposal } : null;
+    pendingTaskAssist = uiState.pending_task_assist ? { ...uiState.pending_task_assist } : null;
+    terminalBuffer = uiState.terminal_tail || terminalBuffer || "";
+    if (terminalSessionId) {
+      terminalBuffers[terminalSessionId] = terminalBuffer;
+    }
     setWorkbenchMode(uiState.workbench_mode || workbenchMode, { persist: false });
     syncQuickFlowUi();
 
@@ -1758,6 +1949,11 @@ async function restoreSessionUiState(session) {
         renderEditorTabs();
       }
     }
+    renderAttachments();
+    renderTaskAssist();
+    renderBatchProposal();
+    renderEditProposal();
+    renderTerminal();
     renderComposerContextPreview();
     renderWorkbenchStatus();
   } finally {
@@ -2067,6 +2263,7 @@ function buildCommandPaletteItems() {
     { label: "Criar arquivo", description: "Cria um arquivo e prepara o Jarvis para implementar", keywords: ["new", "criar", "file", "jarvis"], action: async () => { await preparePromptForCreateFile(); } },
     { label: "Fluxo rápido: abrir/criar alvo", description: resolveQuickTargetPath() || "Usa o alvo do cockpit rápido", keywords: ["quick", "target", "codex", "arquivo"], action: async () => { await openQuickFlowTarget(); } },
     { label: "Fluxo rápido: pedir ao Jarvis", description: "Gera prompt com intenção, alvo e objetivo atuais", keywords: ["quick", "prompt", "codex", "jarvis"], action: async () => { await runQuickFlowPrompt(); } },
+    { label: "Jarvis agir no workspace", description: "Usa o prompt atual para gerar diff, comando e fila operacional", keywords: ["delegate", "codex", "workspace", "apply"], action: async () => { await submitWorkspaceChatPrompt(); } },
     { label: "Anexar terminal ao chat", description: "Leva a saída recente do bash para o próximo prompt", keywords: ["terminal", "attach", "bash", "chat"], action: async () => { await attachTerminalSnapshot(); } },
     { label: "Explicar arquivo atual", description: active ? active.path : "Requer um arquivo aberto", keywords: ["explain", "arquivo", "analise"], action: async () => { preparePromptForActiveFile(); } },
     { label: "Diagnosticar terminal", description: "Usa a saída recente do terminal como contexto", keywords: ["debug", "terminal", "bash"], action: async () => { await preparePromptForTerminalFix(); } },
@@ -2703,6 +2900,7 @@ function renderAttachments() {
   attachmentsEl.innerHTML = "";
   if (!pendingAttachments.length) {
     renderComposerContextPreview();
+    scheduleSessionUiStateSave();
     return;
   }
   for (const attachment of pendingAttachments) {
@@ -2722,6 +2920,7 @@ function renderAttachments() {
   }
   renderComposerContextPreview();
   renderWorkbenchStatus();
+  scheduleSessionUiStateSave();
 }
 
 async function loadWorkspaceTree() {
@@ -2908,6 +3107,7 @@ function renderTerminal() {
   terminalOutputEl.textContent = terminalBuffer || "Terminal pronto.";
   terminalOutputEl.scrollTop = terminalOutputEl.scrollHeight;
   renderComposerContextPreview();
+  scheduleTerminalSnapshotSave();
 }
 
 function mapTerminalKey(event) {
@@ -3787,14 +3987,17 @@ function renderTaskAssist() {
     lines.push(trimTaskOutput(pendingTaskAssist.command_result.output || "[sem saída]"));
   }
   editorTaskOutputEl.textContent = lines.join("\n");
+  scheduleSessionUiStateSave();
 }
 
 function renderBatchProposal() {
   editorBatchProposalsEl.innerHTML = "";
   if (!pendingBatchProposal?.proposals?.length) {
     editorBatchOutputEl.textContent = "Nenhuma proposta em lote ainda.";
+    scheduleSessionUiStateSave();
     return;
   }
+  scheduleSessionUiStateSave();
   const appliedFiles = pendingBatchProposal.proposals.filter((proposal) => proposal.applied).length;
   const lines = [
     `Resumo do lote: ${pendingBatchProposal.summary || "[sem resumo]"}`,
@@ -3925,10 +4128,12 @@ function renderEditProposal() {
   if (!active || !pendingEditProposal || pendingEditProposal.path !== active.path) {
     editorDiffEl.textContent = "Nenhuma proposta de edição ainda.";
     editorHunksEl.innerHTML = "";
+    scheduleSessionUiStateSave();
     return;
   }
   editorDiffEl.textContent = pendingEditProposal.diff || "[sem diferenças detectadas]";
   renderProposalHunks();
+  scheduleSessionUiStateSave();
 }
 
 function renderProposalHunks() {
@@ -4138,6 +4343,7 @@ async function loadStatus() {
 
 function setPending(pending) {
   form.querySelector("#send").disabled = pending;
+  if (sendCodexButton) sendCodexButton.disabled = pending;
   promptEl.disabled = pending;
   attachFileButton.disabled = pending;
 }
@@ -4237,6 +4443,32 @@ async function streamSessionMessage({ sessionId, model, content, displayContent,
     throw new Error("Stream finalizado sem payload final.");
   }
   return finalPayload;
+}
+
+async function runWorkspaceSessionTurn({ sessionId, model, content, displayContent, workspace, path = null, fileContent = null, terminalOutput = null, attachments = [] }) {
+  const response = await fetch(`/api/chat/sessions/${sessionId}/workspace-turn`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: "Bearer local",
+    },
+    body: JSON.stringify({
+      model,
+      content,
+      display_content: displayContent,
+      workspace,
+      path,
+      file_content: fileContent,
+      terminal_output: terminalOutput,
+      attachments,
+      queue_command: true,
+      queue_edit: true,
+    }),
+  });
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}`);
+  }
+  return response.json();
 }
 
 async function registerServiceWorker() {
@@ -4591,6 +4823,7 @@ function buildHelpGuide() {
     "Comandos de automação:",
     "/queue-command -> envia o comando sugerido para a fila do Jarvis",
     "/queue-edit -> envia o diff atual para a fila do Jarvis",
+    "/delegate -> usa o prompt atual para gerar diff/comando e enfileirar acoes",
     "/self-review -> Jarvis revisa o arquivo ativo e enfileira melhorias",
     "",
     "Comandos de Obsidian:",
@@ -4821,6 +5054,9 @@ async function handleSlashCommand(prompt) {
       return true;
     case "queue-edit":
       await queueEditProposalApproval();
+      return true;
+    case "delegate":
+      await submitWorkspaceChatPrompt();
       return true;
     case "self-review":
       await runSelfImproveActive();

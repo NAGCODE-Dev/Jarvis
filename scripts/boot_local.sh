@@ -2,10 +2,11 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-LOG_DIR="$ROOT_DIR/logs"
+eval "$($ROOT_DIR/scripts/_runtime_env.sh "$ROOT_DIR")"
+LOG_DIR="$JARVIS_LOG_DIR"
 PID_FILE="$LOG_DIR/jarvis-core.pid"
 LOG_FILE="$LOG_DIR/jarvis-core.log"
-PYTHON_BIN=$("$ROOT_DIR/scripts/_resolve_python.sh" "$ROOT_DIR" uvicorn fastapi httpx)
+PYTHON_BIN=$($ROOT_DIR/scripts/_resolve_python.sh "$ROOT_DIR" uvicorn fastapi httpx)
 HOST="${JARVIS_HOST:-127.0.0.1}"
 PORT="${JARVIS_PORT:-8000}"
 SEED_DEMO=1
@@ -92,9 +93,7 @@ fi
 
 if [ ! -f "$PID_FILE" ]; then
   echo "[jarvis] Starting Jarvis core on ${HOST}:${PORT}"
-  setsid env PYTHONPATH="$ROOT_DIR/apps/core" \
-    "$PYTHON_BIN" -m uvicorn jarvis.main:app --host "$HOST" --port "$PORT" \
-    </dev/null >"$LOG_FILE" 2>&1 &
+  setsid env PYTHONPATH="$ROOT_DIR/apps/core"     "$PYTHON_BIN" -m uvicorn jarvis.main:app --host "$HOST" --port "$PORT"     </dev/null >"$LOG_FILE" 2>&1 &
   new_pid=$!
   echo "$new_pid" > "$PID_FILE"
 fi
@@ -128,6 +127,6 @@ echo "Log file: $LOG_FILE"
 echo "PID file: $PID_FILE"
 echo
 echo "Next steps:"
-echo "1. Open VS Code: code \"$ROOT_DIR\""
+echo "1. Open VS Code: code "$ROOT_DIR""
 echo "2. Use Continue with Jarvis Programador Quality"
 echo "3. Follow CONTINUE_TESTS.md"

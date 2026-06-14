@@ -353,19 +353,27 @@ scripts/obsidian_plugin_smoke.sh
 
 O Jarvis também pode ser usado como aplicativo Linux local em modo janela, sem depender só do navegador aberto em aba.
 
-Instalar o launcher desktop:
+Para um checkout do repositório:
 
 ```bash
 scripts/install_linux_app.sh
-```
-
-Abrir o Jarvis como app Linux:
-
-```bash
 jarvis-local
 ```
 
-Ou diretamente:
+Para um pacote Debian instalado em `/opt/jarvis-local/app`:
+
+```bash
+scripts/jarvis.sh deb-build
+scripts/jarvis.sh deb-install
+/opt/jarvis-local/app/scripts/jarvis.sh setup-local --dry-run
+/opt/jarvis-local/app/scripts/jarvis.sh setup-local
+/opt/jarvis-local/app/scripts/jarvis.sh doctor
+jarvis-local
+```
+
+Se o launcher não conseguir subir o core automaticamente, ele abre uma página local de recuperação e sugere `setup-local` + `doctor`.
+
+Ou diretamente do checkout:
 
 ```bash
 scripts/run_linux_app.sh

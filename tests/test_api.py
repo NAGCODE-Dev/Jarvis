@@ -144,7 +144,27 @@ def test_session_store_persists_messages_and_metadata(tmp_path, monkeypatch):
         model="jarvis-safe",
         workspace="jarvis",
         mission={"objective": "estabilizar jarvis", "status": "planning", "next_steps": ["revisar router"]},
-        ui_state={"active_file": "apps/web/app.js", "open_files": ["apps/web/app.js", "apps/web/styles.css"], "quick_flow_mode": "implement"},
+        ui_state={
+            "active_file": "apps/web/app.js",
+            "open_files": ["apps/web/app.js", "apps/web/styles.css"],
+            "quick_flow_mode": "implement",
+            "terminal_tail": "pytest -q\nE   AssertionError",
+            "pending_attachments": [{"name": "brief.md", "content": "objetivo atual", "size": 14}],
+            "pending_edit_proposal": {
+                "path": "apps/web/app.js",
+                "instruction": "melhorar render",
+                "proposed_content": "console.log('ok')",
+                "diff": "@@ -1 +1 @@",
+                "hunks": [{"index": 0, "tag": "replace", "original_start": 0, "original_end": 1, "proposed_start": 0, "proposed_end": 1, "original_lines": ["a"], "proposed_lines": ["b"], "preview": "@@ -1 +1 @@", "applied": False}],
+            },
+            "pending_task_assist": {
+                "summary": "Corrigir render",
+                "suggested_command": "pytest -q",
+                "edit_instruction": "ajuste o fluxo",
+                "edit_proposal": {"path": "apps/web/app.js", "proposed_content": "console.log('ok')", "diff": "@@", "hunks": []},
+                "command_result": {"command": "pytest -q", "exit_code": 1, "output": "falhou"},
+            },
+        },
         meta={"pinned": True, "archived": False},
     )
     updated = store.append_exchange(
@@ -170,6 +190,10 @@ def test_session_store_persists_messages_and_metadata(tmp_path, monkeypatch):
     assert updated["mission"]["status"] == "planning"
     assert updated["ui_state"]["active_file"] == "apps/web/app.js"
     assert updated["ui_state"]["open_files"] == ["apps/web/app.js", "apps/web/styles.css"]
+    assert "AssertionError" in (updated["ui_state"]["terminal_tail"] or "")
+    assert updated["ui_state"]["pending_attachments"][0]["name"] == "brief.md"
+    assert updated["ui_state"]["pending_edit_proposal"]["path"] == "apps/web/app.js"
+    assert updated["ui_state"]["pending_task_assist"]["suggested_command"] == "pytest -q"
     assert updated["meta"]["pinned"] is True
     assert updated["meta"]["archived"] is False
     listed = store.list_sessions()
@@ -525,6 +549,32 @@ def test_workspace_and_terminal_api(tmp_path, monkeypatch):
     assert "summary" in task_assist.json()
     assert "suggested_command" in task_assist.json()
     assert "edit_proposal" in task_assist.json()
+
+    workspace_session = client.post("/api/chat/sessions", json={"model": "jarvis-programador-safe", "workspace": "jarvis"})
+    assert workspace_session.status_code == 200
+    workspace_session_id = workspace_session.json()["session"]["id"]
+
+    workspace_turn = client.post(
+        f"/api/chat/sessions/{workspace_session_id}/workspace-turn",
+        json={
+            "model": "jarvis-programador-safe",
+            "content": "Corrija o arquivo ativo e prepare a próxima ação.",
+            "display_content": "Corrija o arquivo ativo e prepare a próxima ação.",
+            "workspace": "jarvis",
+            "path": "hello.txt",
+            "file_content": "hello",
+            "terminal_output": None,
+            "attachments": [{"name": "context.txt", "content": "falha relevante", "size": 14}],
+        },
+    )
+    assert workspace_turn.status_code == 200
+    assert workspace_turn.json()["task_assist"]["summary"] == "Analise inicial pronta"
+    assert len(workspace_turn.json()["approvals"]) == 2
+    assert workspace_turn.json()["approvals"][0]["kind"] == "file_edit"
+    assert workspace_turn.json()["approvals"][1]["kind"] == "terminal_command"
+    assert workspace_turn.json()["session"]["messages"][-1]["metadata"]["workspace_turn"] is True
+    assert workspace_turn.json()["session"]["messages"][-2]["attachments"][0]["name"] == "context.txt"
+    assert workspace_turn.json()["session"]["operations"][-1]["kind"] == "workspace_turn"
 
     task_cycle = client.post(
         "/api/workspace/task-cycle",

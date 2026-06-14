@@ -33,6 +33,7 @@ from jarvis.schemas import (
     SessionCheckpointCreateRequest,
     SessionCreateRequest,
     SessionMessageRequest,
+    SessionWorkspaceTurnRequest,
     SessionOperationRequest,
     SessionTaskCreateRequest,
     SessionTaskUpdateRequest,
@@ -391,6 +392,25 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
             return path, content
         file_payload = workspace_call(workspace.read_file, path)
         return path, str(file_payload["content"])
+
+    def build_workspace_turn_message(task_assist: dict[str, object], *, path: str | None, queued_approvals: list[dict[str, object]]) -> str:
+        lines: list[str] = []
+        summary = str(task_assist.get("summary") or "").strip()
+        if summary:
+            lines.append(summary)
+        if path:
+            lines.append(f"Arquivo alvo: {path}")
+        suggested_command = str(task_assist.get("suggested_command") or "").strip()
+        if suggested_command:
+            lines.append(f"Comando sugerido: {suggested_command}")
+        if queued_approvals:
+            approval_kinds = ", ".join(str(item.get("kind") or "acao") for item in queued_approvals)
+            lines.append(f"Ações enfileiradas: {len(queued_approvals)} ({approval_kinds})")
+        if task_assist.get("edit_proposal") and not queued_approvals:
+            lines.append("Uma proposta de edição foi preparada para revisão.")
+        if not lines:
+            lines.append("Jarvis analisou o contexto operacional e não encontrou ações imediatas.")
+        return "\n".join(lines)
 
     @router.get("/health")
     def health() -> dict[str, str]:
@@ -1017,6 +1037,155 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
         )
         emit_session_event(session_id, "approval_applied", {"approval_id": approval_id, "kind": approval_kind}, source="api")
         return {"status": "ok", "session": sessions.get_session(session_id), "approval": updated_approval, "result": result}
+
+    @router.post("/api/chat/sessions/{session_id}/workspace-turn")
+    def create_chat_session_workspace_turn(session_id: str, request: SessionWorkspaceTurnRequest):
+        session = require_session(session_id)
+        user_content = request.content
+        if request.workspace:
+            user_content = f"[WORKSPACE: {request.workspace}]\n{user_content}"
+        existing_messages = session.get("messages", [])
+        messages = [ChatMessage.model_validate(message) for message in existing_messages]
+        messages.append(ChatMessage(role="user", content=user_content))
+        assistant_metadata = jarvis.describe_request(request.model, messages)
+
+        path, content = resolve_workspace_content(request.path, request.file_content)
+        task_assist = make_task_assist(
+            instruction=user_content,
+            model=request.model,
+            path=path,
+            content=content,
+            workspace_name=request.workspace,
+            terminal_output=request.terminal_output,
+        )
+
+        queued_approvals: list[dict[str, object]] = []
+        if request.queue_edit and isinstance(task_assist.get("edit_proposal"), dict) and path:
+            approval_session = sessions.append_approval(
+                session_id,
+                kind="file_edit",
+                title=f"Diff proposto para {path}",
+                path=path,
+                detail=str(task_assist.get("edit_instruction") or task_assist.get("summary") or "Aplicar edição proposta"),
+                payload={
+                    "path": path,
+                    "proposed_content": task_assist["edit_proposal"].get("proposed_content"),
+                    "diff": task_assist["edit_proposal"].get("diff"),
+                    "instruction": task_assist.get("edit_instruction"),
+                },
+            )
+            approval = dict((approval_session.get("approvals") or [])[-1])
+            queued_approvals.append(approval)
+            emit_session_event(session_id, "approval_created", {"kind": approval.get("kind"), "title": approval.get("title"), "path": approval.get("path")}, source="workspace_turn")
+
+        suggested_command = str(task_assist.get("suggested_command") or "").strip()
+        if request.queue_command and suggested_command:
+            command_cwd = "."
+            if path:
+                parent = PurePosixPath(path).parent.as_posix()
+                command_cwd = "." if parent in {"", "."} else parent
+            approval_session = sessions.append_approval(
+                session_id,
+                kind="terminal_command",
+                title="Comando sugerido pelo Jarvis",
+                path=path,
+                command=suggested_command,
+                detail=str(task_assist.get("summary") or "Comando operacional sugerido"),
+                payload={"command": suggested_command, "cwd": command_cwd},
+            )
+            approval = dict((approval_session.get("approvals") or [])[-1])
+            queued_approvals.append(approval)
+            emit_session_event(session_id, "approval_created", {"kind": approval.get("kind"), "title": approval.get("title"), "command": approval.get("command")}, source="workspace_turn")
+
+        assistant_content = build_workspace_turn_message(task_assist, path=path, queued_approvals=queued_approvals)
+        assistant_metadata = {
+            **assistant_metadata,
+            "workspace_turn": True,
+            "target_path": path,
+            "queued_approvals": len(queued_approvals),
+            "suggested_command": suggested_command or None,
+        }
+        turn_snapshot = {
+            "workspace": request.workspace,
+            "mission": session.get("mission") or None,
+            "ui_state": {
+                **(session.get("ui_state") or {}),
+                "active_file": path,
+                "pending_attachments": [attachment.model_dump() for attachment in (request.attachments or [])],
+                "pending_edit_proposal": task_assist.get("edit_proposal"),
+                "pending_task_assist": task_assist,
+                "terminal_tail": request.terminal_output,
+                "workbench_mode": "review" if queued_approvals else "build",
+            },
+        }
+        sessions.append_exchange(
+            session_id,
+            user_content=user_content,
+            user_display_content=request.display_content,
+            assistant_content=assistant_content,
+            model=request.model,
+            workspace=request.workspace,
+            assistant_metadata=assistant_metadata,
+            user_attachments=[attachment.model_dump() for attachment in (request.attachments or [])],
+        )
+        sessions.append_operation(
+            session_id,
+            kind="workspace_turn",
+            title="Executou turno operacional do Jarvis",
+            path=path,
+            command=suggested_command or None,
+            detail=str(task_assist.get("summary") or request.content)[:240],
+            metadata={"queued_approvals": len(queued_approvals), "workspace_turn": True},
+        )
+        updated_session, turn = sessions.append_turn(
+            session_id,
+            kind="workspace_turn",
+            title="Turno operacional do Jarvis",
+            summary=str(task_assist.get("summary") or "")[:4000] or None,
+            path=path,
+            workspace=request.workspace,
+            model=request.model,
+            user_prompt=request.display_content or request.content,
+            suggested_command=suggested_command or None,
+            edit_instruction=str(task_assist.get("edit_instruction") or "")[:4000] or None,
+            approvals=queued_approvals,
+            task_assist=task_assist,
+            snapshot=turn_snapshot,
+            metadata=assistant_metadata,
+        )
+        memory.record_exchange(
+            user_content=user_content,
+            user_display_content=request.display_content,
+            assistant_content=assistant_content,
+            model=request.model,
+            workspace=request.workspace,
+        )
+        emit_session_event(session_id, "workspace_turn_created", {"workspace": request.workspace, "path": path, "queued_approvals": len(queued_approvals), "turn_id": turn.get("id")}, source="workspace_turn")
+        emit_session_event(session_id, "memory_updated", {"workspace": request.workspace, "model": request.model}, source="memory")
+        return {
+            "status": "ok",
+            "session": sessions.get_session(session_id),
+            "message": assistant_content,
+            "task_assist": task_assist,
+            "approvals": queued_approvals,
+            "turn": turn,
+        }
+
+    @router.post("/api/chat/sessions/{session_id}/turns/{turn_id}/restore")
+    def restore_chat_session_turn(session_id: str, turn_id: str):
+        require_session(session_id)
+        session, turn = sessions.restore_turn(session_id, turn_id)
+        session = sessions.append_operation(
+            session_id,
+            kind="turn_restore",
+            title=f"Restaurou turno {turn.get('title') or turn.get('id')}",
+            path=turn.get("path"),
+            command=turn.get("suggested_command"),
+            detail=turn.get("summary"),
+            metadata={"turn_id": turn.get("id")},
+        )
+        emit_session_event(session_id, "workspace_turn_restored", {"turn_id": turn.get("id"), "path": turn.get("path")}, source="api")
+        return {"status": "ok", "session": sessions.get_session(session_id), "turn": turn}
 
     @router.post("/api/chat/sessions/{session_id}/message")
     def create_chat_session_message(session_id: str, request: SessionMessageRequest):

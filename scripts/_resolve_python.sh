@@ -4,7 +4,8 @@ set -eu
 ROOT_DIR="$1"
 shift || true
 
-VENV_PYTHON="$ROOT_DIR/.venv/bin/python"
+eval "$($ROOT_DIR/scripts/_runtime_env.sh "$ROOT_DIR")"
+VENV_PYTHON="$JARVIS_VENV_DIR/bin/python"
 
 check_python() {
   python_bin="$1"
@@ -19,12 +20,14 @@ check_python() {
 }
 
 if [ -x "$VENV_PYTHON" ] && check_python "$VENV_PYTHON" "$@"; then
-  printf '%s\n' "$VENV_PYTHON"
+  printf '%s
+' "$VENV_PYTHON"
   exit 0
 fi
 
 if check_python "python3" "$@"; then
-  printf '%s\n' "python3"
+  printf '%s
+' "python3"
   exit 0
 fi
 

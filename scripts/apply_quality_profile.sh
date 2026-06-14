@@ -2,7 +2,9 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-ENV_FILE="$ROOT_DIR/.env"
+eval "$($ROOT_DIR/scripts/_runtime_env.sh "$ROOT_DIR")"
+ENV_FILE="$JARVIS_ENV_FILE"
+mkdir -p "$(dirname "$ENV_FILE")"
 
 ensure_key() {
   key="$1"
@@ -13,12 +15,12 @@ ensure_key() {
     sed "s|^${key}=.*|${key}=${value}|" "$ENV_FILE" > "$tmp_file"
     mv "$tmp_file" "$ENV_FILE"
   else
-    printf '%s=%s\n' "$key" "$value" >> "$ENV_FILE"
+    printf '%s=%s
+' "$key" "$value" >> "$ENV_FILE"
   fi
 }
 
 touch "$ENV_FILE"
-
 ensure_key "JARVIS_HOST" "127.0.0.1"
 ensure_key "JARVIS_PORT" "8000"
 ensure_key "JARVIS_LOG_LEVEL" "info"

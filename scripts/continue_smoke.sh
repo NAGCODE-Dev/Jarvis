@@ -2,7 +2,8 @@
 set -eu
 
 ROOT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-SMOKE_DIR="$ROOT_DIR/.continue-smoke"
+eval "$($ROOT_DIR/scripts/_runtime_env.sh "$ROOT_DIR")"
+SMOKE_DIR="$JARVIS_RUNTIME_HOME/continue-smoke"
 SMOKE_FILE="$SMOKE_DIR/continue_smoke.py"
 
 mkdir -p "$SMOKE_DIR"
@@ -48,4 +49,3 @@ echo "6. Chat with 'Jarvis Geral Quality':"
 echo "   Com base no workspace Jarvis, o que este projeto já suporta hoje?"
 echo "7. Chat with 'Jarvis Pesquisador':"
 echo "   Procure contexto documental local sobre Linux ou CrossFit se existir."
-

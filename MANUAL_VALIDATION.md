@@ -50,11 +50,23 @@ scripts/pwa_smoke.sh
 
 Para validar o Jarvis como aplicação Linux local:
 
+Fluxo checkout do repositório:
+
 1. Rode `scripts/install_linux_app.sh`
 2. Confirme que o launcher `jarvis-local` foi criado em `~/.local/bin`
 3. Confirme que a entrada `.desktop` foi criada em `~/.local/share/applications/jarvis-local.desktop`
 4. Abra pelo menu do sistema procurando `Jarvis Local` ou rode `jarvis-local`
 5. Confirme que a interface abre em modo app apontando para `http://127.0.0.1:8000/app/`
+
+Fluxo pacote Debian:
+
+1. Rode `scripts/jarvis.sh deb-build`
+2. Rode `scripts/jarvis.sh deb-install`
+3. Rode `/opt/jarvis-local/app/scripts/jarvis.sh setup-local --dry-run`
+4. Rode `/opt/jarvis-local/app/scripts/jarvis.sh setup-local`
+5. Rode `/opt/jarvis-local/app/scripts/jarvis.sh doctor`
+6. Abra pelo menu do sistema procurando `Jarvis Local` ou rode `jarvis-local`
+7. Se o core não subir, confirme que a página local de recuperação foi aberta e siga o fluxo `setup-local --dry-run -> setup-local -> doctor -> boot --no-seed`
 
 Smoke rápido:
 

@@ -30,6 +30,8 @@ Uso:
   scripts/jarvis.sh core
   scripts/jarvis.sh stop
   scripts/jarvis.sh status
+  scripts/jarvis.sh doctor
+  scripts/jarvis.sh setup-local [--speed|--quality] [--with-infra] [--with-models] [--dry-run]
   scripts/jarvis.sh verify [args]
   scripts/jarvis.sh deb-build
   scripts/jarvis.sh deb-install [--rebuild]
@@ -58,6 +60,12 @@ case "$COMMAND" in
     ;;
   status)
     exec "$ROOT_DIR/scripts/status.sh" "$@"
+    ;;
+  doctor)
+    exec "$ROOT_DIR/scripts/package_doctor.sh" "$@"
+    ;;
+  setup-local)
+    exec "$ROOT_DIR/scripts/package_setup.sh" "$@"
     ;;
   verify)
     exec "$ROOT_DIR/scripts/verify_local.sh" "$@"
