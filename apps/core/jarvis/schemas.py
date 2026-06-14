@@ -206,6 +206,19 @@ class SessionApprovalActionRequest(BaseModel):
     action: Literal["apply", "reject"] = "apply"
 
 
+class SessionApprovalBatchActionRequest(BaseModel):
+    action: Literal["apply", "reject"] = "apply"
+    approval_ids: list[str] | None = None
+    pending_only: bool = True
+
+
+class SessionNoteSyncRequest(BaseModel):
+    workspace: str | None = None
+    remember: bool = True
+    index: bool = True
+    force: bool = True
+
+
 class WorkspaceFileRequest(BaseModel):
     path: str
 

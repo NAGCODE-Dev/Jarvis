@@ -23,6 +23,18 @@ const taskPhaseEl = document.querySelector("#task-phase");
 const createTaskButton = document.querySelector("#create-task");
 const taskBoardEl = document.querySelector("#task-board");
 const workbenchStatusEl = document.querySelector("#workbench-status");
+const starterInspectProjectButton = document.querySelector("#starter-inspect-project");
+const starterFixErrorButton = document.querySelector("#starter-fix-error");
+const starterCreateFileButton = document.querySelector("#starter-create-file");
+const starterNextStepButton = document.querySelector("#starter-next-step");
+const starterGuidedButton = document.querySelector("#starter-guided");
+const starterReadinessEl = document.querySelector("#starter-readiness");
+const starterContextEl = document.querySelector("#starter-context");
+const workspaceQualityFirstCheckbox = document.querySelector("#workspace-quality-first");
+const workspaceAutoProfileCheckbox = document.querySelector("#workspace-auto-profile");
+const applyWorkspacePresetButton = document.querySelector("#apply-workspace-preset");
+const saveWorkspacePresetButton = document.querySelector("#save-workspace-preset");
+const workspacePresetStatusEl = document.querySelector("#workspace-preset-status");
 const workbenchModeButtons = Array.from(document.querySelectorAll(".workbench-mode"));
 const attachmentsEl = document.querySelector("#attachments");
 const clearButton = document.querySelector("#clear-chat");
@@ -42,6 +54,8 @@ const sessionFiltersEl = document.querySelector("#session-filters");
 const sessionFilterButtons = Array.from(document.querySelectorAll(".session-filter"));
 const pinSessionButton = document.querySelector("#pin-session");
 const archiveSessionButton = document.querySelector("#archive-session");
+const openSessionNoteButton = document.querySelector("#open-session-note");
+const attachSessionNoteButton = document.querySelector("#attach-session-note");
 const exportChatButton = document.querySelector("#export-chat");
 const sendCodexButton = document.querySelector("#send-codex");
 const promptActiveFileButton = document.querySelector("#prompt-active-file");
@@ -60,6 +74,15 @@ const commandPaletteBackdropEl = document.querySelector("#command-palette-backdr
 const commandPaletteInputEl = document.querySelector("#command-palette-input");
 const commandPaletteResultsEl = document.querySelector("#command-palette-results");
 const closeCommandPaletteButton = document.querySelector("#close-command-palette");
+const onboardingWizardEl = document.querySelector("#onboarding-wizard");
+const onboardingWizardBackdropEl = document.querySelector("#onboarding-wizard-backdrop");
+const onboardingWizardFormEl = document.querySelector("#onboarding-wizard-form");
+const closeOnboardingWizardButton = document.querySelector("#close-onboarding-wizard");
+const onboardingModeEl = document.querySelector("#onboarding-mode");
+const onboardingWorkspaceEl = document.querySelector("#onboarding-workspace");
+const onboardingGoalEl = document.querySelector("#onboarding-goal");
+const onboardingTargetPathEl = document.querySelector("#onboarding-target-path");
+const onboardingSkipButton = document.querySelector("#onboarding-skip");
 const quickActionButtons = Array.from(document.querySelectorAll(".quick-action"));
 const refreshFilesButton = document.querySelector("#refresh-files");
 const newFileButton = document.querySelector("#new-file");
@@ -75,6 +98,7 @@ const refreshOperationsButton = document.querySelector("#refresh-operations");
 const createCheckpointButton = document.querySelector("#create-checkpoint");
 const sessionOperationsEl = document.querySelector("#session-operations");
 const sessionCheckpointsEl = document.querySelector("#session-checkpoints");
+const sessionTurnsEl = document.querySelector("#session-turns");
 const sessionTimelineFiltersEl = document.querySelector("#timeline-filters");
 const sessionTimelineFilterButtons = Array.from(document.querySelectorAll(".timeline-filter"));
 const sessionTimelineEl = document.querySelector("#session-timeline");
@@ -122,6 +146,7 @@ const terminalOutputEl = document.querySelector("#terminal-output");
 const rememberNoteButton = document.querySelector("#remember-note");
 const indexNoteButton = document.querySelector("#index-note");
 const chatAboutNoteButton = document.querySelector("#chat-about-note");
+const syncSessionNoteButton = document.querySelector("#sync-session-note");
 const obsidianStatusEl = document.querySelector("#obsidian-status");
 const obsidianAutoRememberCheckbox = document.querySelector("#obsidian-auto-remember");
 const obsidianAutoIndexCheckbox = document.querySelector("#obsidian-auto-index");
@@ -147,6 +172,8 @@ const gitOutputEl = document.querySelector("#git-output");
 const githubTargetInput = document.querySelector("#github-target");
 const githubTitleInput = document.querySelector("#github-title");
 const refreshApprovalsButton = document.querySelector("#refresh-approvals");
+const applyPendingApprovalsButton = document.querySelector("#apply-pending-approvals");
+const rejectPendingApprovalsButton = document.querySelector("#reject-pending-approvals");
 const selfImproveActiveButton = document.querySelector("#self-improve-active");
 const queueSuggestedCommandButton = document.querySelector("#queue-suggested-command");
 const queueEditProposalButton = document.querySelector("#queue-edit-proposal");
@@ -160,6 +187,7 @@ let pendingAttachments = [];
 let allSessions = [];
 let currentSessionOperations = [];
 let currentSessionCheckpoints = [];
+let currentSessionTurns = [];
 let currentSessionMeta = { pinned: false, archived: false };
 let currentSessionFilter = "active";
 let dragDepth = 0;
@@ -176,6 +204,8 @@ let terminalPollTimer = null;
 let terminalBuffer = "";
 let terminalBuffers = {};
 let editorSelection = null;
+let latestStatus = null;
+let latestMemoryContext = null;
 let recentFiles = [];
 let commandHistory = [];
 let latestGitContext = "";
@@ -183,6 +213,7 @@ let currentApprovals = [];
 let currentMission = null;
 let currentTasks = [];
 let currentEvents = [];
+let workspacePresets = {};
 let currentSessionUiState = null;
 let sessionUiStateSaveTimer = null;
 let restoringSessionUiState = false;
@@ -256,6 +287,101 @@ function buildPersistableTaskAssist(taskAssist) {
   };
 }
 
+function getWorkspacePresetKey(workspace = workspaceInput?.value) {
+  const normalized = String(workspace || "").trim().toLowerCase();
+  return normalized || DEFAULT_WORKSPACE_PRESET_KEY;
+}
+
+function currentQualityFirst() {
+  return workspaceQualityFirstCheckbox?.checked !== false;
+}
+
+function currentAutoProfile() {
+  return workspaceAutoProfileCheckbox?.checked !== false;
+}
+
+function normalizeWorkspacePreset(preset = null) {
+  const qualityFirst = preset?.qualityFirst !== false;
+  const autoProfile = preset?.autoProfile !== false;
+  const contextPrefs = preset?.contextPrefs || {};
+  return {
+    qualityFirst,
+    autoProfile,
+    preferredModel: preset?.preferredModel || null,
+    workbenchMode: ["chat", "build", "review", "focus"].includes(preset?.workbenchMode) ? preset.workbenchMode : null,
+    quickFlowMode: typeof QUICK_FLOW_CONFIG !== "undefined" && QUICK_FLOW_CONFIG[preset?.quickFlowMode] ? preset.quickFlowMode : null,
+    terminalCwd: preset?.terminalCwd || null,
+    contextPrefs: {
+      activeFile: contextPrefs.activeFile !== false,
+      openTabs: Boolean(contextPrefs.openTabs),
+      terminal: contextPrefs.terminal !== false,
+      search: Boolean(contextPrefs.search),
+    },
+    updatedAt: preset?.updatedAt || null,
+  };
+}
+
+function loadWorkspacePresets() {
+  try {
+    const raw = localStorage.getItem(WORKSPACE_PRESETS_KEY);
+    workspacePresets = raw ? JSON.parse(raw) || {} : {};
+  } catch {
+    workspacePresets = {};
+  }
+}
+
+function persistWorkspacePresets() {
+  localStorage.setItem(WORKSPACE_PRESETS_KEY, JSON.stringify(workspacePresets));
+}
+
+function getCurrentWorkspacePreset() {
+  return normalizeWorkspacePreset(workspacePresets[getWorkspacePresetKey()]);
+}
+
+function classifyModelFamily(model) {
+  const value = String(model || "");
+  if (value.startsWith("jarvis-programador")) return "programador";
+  if (value.startsWith("jarvis-pesquisador")) return "pesquisador";
+  if (value.startsWith("jarvis-professor")) return "professor";
+  if (value.startsWith("jarvis-coach")) return "coach";
+  return "general";
+}
+
+function resolveQualityAwareModel(familyOrModel, qualityFirst = currentQualityFirst()) {
+  const family = QUALITY_MODEL_MAP[familyOrModel] ? familyOrModel : classifyModelFamily(familyOrModel);
+  const entry = QUALITY_MODEL_MAP[family] || QUALITY_MODEL_MAP.general;
+  return qualityFirst ? entry.quality : entry.safe;
+}
+
+function renderWorkspacePresetStatus(message = null) {
+  if (!workspacePresetStatusEl) return;
+  if (message) {
+    workspacePresetStatusEl.textContent = message;
+    return;
+  }
+  const workspace = String(workspaceInput?.value || "").trim();
+  const key = getWorkspacePresetKey(workspace);
+  const preset = workspacePresets[key];
+  if (!preset) {
+    workspacePresetStatusEl.textContent = workspace
+      ? `Sem preset salvo para ${workspace}.`
+      : "Sem preset salvo para o workspace padrão.";
+    return;
+  }
+  const normalized = normalizeWorkspacePreset(preset);
+  const scope = workspace || "padrão";
+  const model = normalized.preferredModel ? resolveQualityAwareModel(normalized.preferredModel, normalized.qualityFirst) : "auto";
+  workspacePresetStatusEl.textContent = [
+    `Preset ${scope}`,
+    normalized.qualityFirst ? "qualidade" : "mais leve",
+    normalized.autoProfile ? "perfil automático" : `perfil fixo ${model}`,
+    normalized.workbenchMode ? `modo ${normalized.workbenchMode}` : null,
+    normalized.quickFlowMode ? `fluxo ${normalized.quickFlowMode}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
 function scheduleTerminalSnapshotSave() {
   if (!currentSessionId || restoringSessionUiState) return;
   if (terminalUiStateSaveTimer) {
@@ -274,10 +400,20 @@ let commandPaletteItems = [];
 const STORAGE_KEY = "jarvis-pwa-current-session-id";
 const QUICK_FLOW_MODE_KEY = "jarvis-pwa-quick-flow-mode";
 const CONTEXT_PREFS_KEY = "jarvis-pwa-context-prefs";
+const ONBOARDING_SEEN_PREFIX = "jarvis-pwa-onboarding-seen:";
 const RECENT_FILES_KEY = "jarvis-pwa-recent-files";
 const COMMAND_HISTORY_KEY = "jarvis-pwa-command-history";
 const OBSIDIAN_PREFS_KEY = "jarvis-pwa-obsidian-prefs";
 const WORKBENCH_MODE_KEY = "jarvis-pwa-workbench-mode";
+const WORKSPACE_PRESETS_KEY = "jarvis-pwa-workspace-presets";
+const DEFAULT_WORKSPACE_PRESET_KEY = "__default__";
+const QUALITY_MODEL_MAP = {
+  general: { quality: "jarvis", safe: "jarvis-safe" },
+  programador: { quality: "jarvis-programador", safe: "jarvis-programador-safe" },
+  pesquisador: { quality: "jarvis-pesquisador", safe: "jarvis-pesquisador-safe" },
+  professor: { quality: "jarvis-professor", safe: "jarvis-professor" },
+  coach: { quality: "jarvis-coach", safe: "jarvis-coach" },
+};
 const SLASH_COMMANDS = [
   { label: "/help", mode: "run", value: "/help" },
   { label: "/open", mode: "fill", value: "/open apps/web/app.js" },
@@ -317,10 +453,6 @@ const SLASH_COMMANDS = [
   { label: "/self-review", mode: "run", value: "/self-review" },
   { label: "/focus terminal", mode: "run", value: "/focus terminal" },
 ];
-
-bootstrap().catch((error) => {
-  statusEl.textContent = `Erro ao inicializar: ${error.message}`;
-});
 
 window.addEventListener("keydown", async (event) => {
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
@@ -374,6 +506,7 @@ async function loadCurrentSessionOperations() {
   const payload = await api(`/api/chat/sessions/${currentSessionId}`);
   currentSessionOperations = payload.session.operations || [];
   currentSessionCheckpoints = payload.session.checkpoints || [];
+  currentSessionTurns = payload.session.turns || [];
   currentApprovals = payload.session.approvals || [];
   currentMission = payload.session.mission || null;
   currentTasks = payload.session.tasks || [];
@@ -383,6 +516,7 @@ async function loadCurrentSessionOperations() {
   syncSessionMetaControls();
   renderSessionOperations();
   renderSessionCheckpoints();
+  renderSessionTurns();
   renderSessionTimeline();
   renderApprovals();
   renderEventStream();
@@ -420,7 +554,7 @@ function renderEventStream() {
 }
 
 function setTimelineFilter(filter) {
-  const normalized = ["all", "checkpoint", "operation", "event", "file", "terminal", "approval", "task"].includes(filter) ? filter : "all";
+  const normalized = ["all", "checkpoint", "operation", "event", "file", "terminal", "approval", "task", "turn"].includes(filter) ? filter : "all";
   currentTimelineFilter = normalized;
   sessionTimelineFilterButtons.forEach((button) => {
     button.classList.toggle("active", (button.dataset.timelineFilter || "all") === normalized);
@@ -430,6 +564,7 @@ function setTimelineFilter(filter) {
 
 function classifyTimelineItem(item) {
   if (item.kind === "checkpoint") return "checkpoint";
+  if (item.kind === "turn") return "turn";
   if (item.kind === "event") {
     const type = String(item.event_type || item.title || "").toLowerCase();
     if (type.includes("task")) return "task";
@@ -485,6 +620,31 @@ function renderSessionCheckpoints() {
   }
 }
 
+async function restoreSessionCheckpoint(checkpointId) {
+  if (!currentSessionId) return;
+  const payload = await api(`/api/chat/sessions/${currentSessionId}/checkpoints/${checkpointId}/restore`, {
+    method: "POST",
+  });
+  currentSessionOperations = payload.session.operations || currentSessionOperations;
+  currentSessionCheckpoints = payload.session.checkpoints || currentSessionCheckpoints;
+  currentSessionTurns = payload.session.turns || currentSessionTurns;
+  currentApprovals = payload.session.approvals || currentApprovals;
+  currentMission = payload.session.mission || currentMission;
+  currentTasks = payload.session.tasks || currentTasks;
+  currentEvents = payload.session.events || currentEvents;
+  currentSessionUiState = payload.session.ui_state || currentSessionUiState;
+  workspaceInput.value = payload.session.workspace || workspaceInput.value;
+  await restoreSessionUiState(payload.session);
+  renderSessionOperations();
+  renderSessionCheckpoints();
+  renderSessionTurns();
+  renderSessionTimeline();
+  renderApprovals();
+  renderEventStream();
+  renderMissionControl();
+  announceAssistantMessage("Checkpoint restaurado na sessão atual.");
+}
+
 function buildSessionTimelineItems() {
   const operationItems = currentSessionOperations.map((item) => ({
     kind: "operation",
@@ -507,7 +667,14 @@ function buildSessionTimelineItems() {
     checkpoint_id: item.id,
     message_count: item.message_count || 0,
   }));
-  return [...operationItems, ...eventItems, ...checkpointItems]
+  const turnItems = currentSessionTurns.map((item) => ({
+    kind: "turn",
+    created_at: item.created_at,
+    title: item.title || "Turno operacional",
+    detail: [item.path, item.summary, item.suggested_command ? `$ ${item.suggested_command}` : null, item.workspace ? `workspace: ${item.workspace}` : null].filter(Boolean).join("\n"),
+    turn_id: item.id,
+  }));
+  return [...operationItems, ...eventItems, ...checkpointItems, ...turnItems]
     .filter((item) => item.created_at)
     .sort((left, right) => String(right.created_at).localeCompare(String(left.created_at)));
 }
@@ -553,8 +720,72 @@ function renderSessionTimeline() {
       actions.append(restoreButton, replayButton);
       card.appendChild(actions);
     }
+    if (item.kind === "turn" && item.turn_id) {
+      const actions = document.createElement("div");
+      actions.className = "session-timeline-actions";
+      const restoreButton = document.createElement("button");
+      restoreButton.type = "button";
+      restoreButton.className = "secondary";
+      restoreButton.textContent = "Restaurar turno";
+      restoreButton.addEventListener("click", async () => {
+        await restoreSessionTurn(item.turn_id);
+      });
+      actions.append(restoreButton);
+      card.appendChild(actions);
+    }
     sessionTimelineEl.appendChild(card);
   }
+}
+
+function renderSessionTurns() {
+  if (!sessionTurnsEl) return;
+  sessionTurnsEl.innerHTML = "";
+  if (!currentSessionTurns.length) {
+    sessionTurnsEl.textContent = "Nenhum turno operacional ainda.";
+    return;
+  }
+  for (const turn of [...currentSessionTurns].reverse().slice(0, 16)) {
+    const card = document.createElement("div");
+    card.className = "session-turn-card";
+    card.innerHTML = `<strong>${escapeHtml(turn.title || "Turno operacional")}</strong><span>${escapeHtml([turn.path, turn.summary, turn.suggested_command ? `$ ${turn.suggested_command}` : null, turn.created_at].filter(Boolean).join("\n") || "turno operacional")}</span>`;
+    const actions = document.createElement("div");
+    actions.className = "session-turn-actions";
+    const restoreButton = document.createElement("button");
+    restoreButton.type = "button";
+    restoreButton.className = "secondary";
+    restoreButton.textContent = "Restaurar turno";
+    restoreButton.addEventListener("click", async () => {
+      await restoreSessionTurn(turn.id);
+    });
+    actions.append(restoreButton);
+    card.appendChild(actions);
+    sessionTurnsEl.appendChild(card);
+  }
+}
+
+async function restoreSessionTurn(turnId) {
+  if (!currentSessionId) return;
+  const payload = await api(`/api/chat/sessions/${currentSessionId}/turns/${turnId}/restore`, {
+    method: "POST",
+  });
+  currentSessionOperations = payload.session.operations || currentSessionOperations;
+  currentSessionCheckpoints = payload.session.checkpoints || currentSessionCheckpoints;
+  currentSessionTurns = payload.session.turns || currentSessionTurns;
+  currentApprovals = payload.session.approvals || currentApprovals;
+  currentMission = payload.session.mission || currentMission;
+  currentTasks = payload.session.tasks || currentTasks;
+  currentEvents = payload.session.events || currentEvents;
+  currentSessionUiState = payload.session.ui_state || currentSessionUiState;
+  workspaceInput.value = payload.session.workspace || workspaceInput.value;
+  await restoreSessionUiState(payload.session);
+  renderSessionOperations();
+  renderSessionCheckpoints();
+  renderSessionTurns();
+  renderSessionTimeline();
+  renderApprovals();
+  renderEventStream();
+  renderMissionControl();
+  announceAssistantMessage("Turno operacional restaurado na sessão atual.");
 }
 
 function renderSessionOperations() {
@@ -584,8 +815,10 @@ async function appendSessionOperation(operation) {
   });
   currentSessionOperations = payload.session.operations || [];
   currentSessionCheckpoints = payload.session.checkpoints || currentSessionCheckpoints;
+  currentSessionTurns = payload.session.turns || currentSessionTurns;
   renderSessionOperations();
   renderSessionCheckpoints();
+  renderSessionTurns();
   renderSessionTimeline();
   renderEventStream();
   renderMissionControl();
@@ -669,6 +902,14 @@ pinSessionButton?.addEventListener("click", async () => {
 
 archiveSessionButton?.addEventListener("click", async () => {
   await toggleCurrentSessionMeta("archived");
+});
+
+openSessionNoteButton?.addEventListener("click", async () => {
+  await openCurrentSessionNote();
+});
+
+attachSessionNoteButton?.addEventListener("click", async () => {
+  await attachCurrentSessionNote();
 });
 
 exportChatButton.addEventListener("click", () => {
@@ -875,6 +1116,14 @@ refreshApprovalsButton.addEventListener("click", async () => {
   await loadCurrentSessionApprovals();
 });
 
+applyPendingApprovalsButton?.addEventListener("click", async () => {
+  await actOnPendingApprovals("apply");
+});
+
+rejectPendingApprovalsButton?.addEventListener("click", async () => {
+  await actOnPendingApprovals("reject");
+});
+
 selfImproveActiveButton.addEventListener("click", async () => {
   await runSelfImproveActive();
 });
@@ -885,6 +1134,44 @@ queueSuggestedCommandButton.addEventListener("click", async () => {
 
 queueEditProposalButton.addEventListener("click", async () => {
   await queueEditProposalApproval();
+});
+
+starterInspectProjectButton?.addEventListener("click", async () => {
+  await startGettingStartedFlow("inspect-project");
+});
+
+starterFixErrorButton?.addEventListener("click", async () => {
+  await startGettingStartedFlow("fix-error");
+});
+
+starterCreateFileButton?.addEventListener("click", async () => {
+  await startGettingStartedFlow("create-file");
+});
+
+starterNextStepButton?.addEventListener("click", async () => {
+  await startGettingStartedFlow("next-step");
+});
+
+starterGuidedButton?.addEventListener("click", () => {
+  openOnboardingWizard();
+});
+
+onboardingWizardBackdropEl?.addEventListener("click", () => {
+  closeOnboardingWizard();
+});
+
+closeOnboardingWizardButton?.addEventListener("click", () => {
+  closeOnboardingWizard();
+});
+
+onboardingSkipButton?.addEventListener("click", () => {
+  markOnboardingSeen();
+  closeOnboardingWizard();
+});
+
+onboardingWizardFormEl?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  await submitOnboardingWizard();
 });
 
 obsidianAutoRememberCheckbox.addEventListener("change", () => {
@@ -1299,6 +1586,10 @@ chatAboutNoteButton.addEventListener("click", () => {
   prepareChatFromCurrentNote();
 });
 
+syncSessionNoteButton.addEventListener("click", async () => {
+  await syncCurrentSessionNoteToObsidian();
+});
+
 terminalOutputEl.addEventListener("click", () => {
   terminalOutputEl.focus();
 });
@@ -1496,7 +1787,7 @@ async function submitWorkspaceChatPrompt() {
       content: attachment.content,
       size: attachment.size,
     }));
-    const payload = await runWorkspaceSessionTurn({
+    const payload = await streamWorkspaceSessionTurn({
       sessionId: currentSessionId,
       model: modelSelect.value,
       content: attachmentPrompt,
@@ -1530,6 +1821,7 @@ async function submitWorkspaceChatPrompt() {
     renderEditProposal();
     renderApprovals();
     renderSessionOperations();
+    renderSessionTurns();
     renderEventStream();
     await loadCurrentSessionOperations();
     if ((active?.path || targetPath) && payload.approvals?.length) {
@@ -1540,6 +1832,8 @@ async function submitWorkspaceChatPrompt() {
     await loadSessions();
   } catch (error) {
     stopSessionReplay({ render: false });
+    messages = messages.slice(0, Math.max(0, messages.length - 2));
+    renderMessages();
     appendMessageElement("assistant", `Erro ao executar o fluxo operacional do Jarvis: ${error.message}`);
   } finally {
     setPending(false);
@@ -1586,6 +1880,7 @@ promptEl.addEventListener("keydown", (event) => {
 });
 
 modelSelect.addEventListener("change", async () => {
+  renderWorkspacePresetStatus();
   if (!currentSessionId) return;
   await api(`/api/chat/sessions/${currentSessionId}`, {
     method: "PUT",
@@ -1601,7 +1896,34 @@ workspaceInput.addEventListener("change", async () => {
     body: JSON.stringify({ workspace: workspaceInput.value.trim() || null }),
   });
   await loadSessions();
+  await applyWorkspacePresetForCurrent({ allowModelSwitch: true });
+  await loadStarterContext();
 });
+
+workspaceQualityFirstCheckbox?.addEventListener("change", async () => {
+  renderWorkspacePresetStatus();
+  if (currentAutoProfile()) {
+    await syncAdaptiveModel();
+  } else if (modelSelect.value) {
+    await setPreferredModel(resolveQualityAwareModel(modelSelect.value, currentQualityFirst()));
+  }
+});
+
+workspaceAutoProfileCheckbox?.addEventListener("change", async () => {
+  renderWorkspacePresetStatus();
+  if (currentAutoProfile()) {
+    await syncAdaptiveModel();
+  }
+});
+
+applyWorkspacePresetButton?.addEventListener("click", async () => {
+  await applyWorkspacePresetForCurrent({ announce: true, allowModelSwitch: true });
+});
+
+saveWorkspacePresetButton?.addEventListener("click", async () => {
+  await saveWorkspacePreset();
+});
+
 sessionTitleEl.addEventListener("change", async () => {
   if (!currentSessionId) return;
   await api(`/api/chat/sessions/${currentSessionId}`, {
@@ -1618,6 +1940,10 @@ async function bootstrap() {
   loadCommandHistory();
   loadWorkbenchMode();
   loadQuickFlowMode();
+  loadWorkspacePresets();
+  if (modelSelect && !modelSelect.value) {
+    modelSelect.value = "jarvis";
+  }
   renderMessages();
   renderRecentFiles();
   renderMissionControl();
@@ -1627,6 +1953,7 @@ async function bootstrap() {
   renderSlashCommands();
   renderObsidianStatus();
   syncQuickFlowUi();
+  renderWorkspacePresetStatus();
   renderComposerContextPreview();
   renderWorkbenchStatus();
   await loadStatus();
@@ -1638,6 +1965,11 @@ async function bootstrap() {
     await createSession();
   }
   setWorkbenchMode(workbenchMode, { persist: false });
+  await applyWorkspacePresetForCurrent({ allowModelSwitch: false });
+  await loadStarterContext();
+  if (shouldOpenOnboardingWizard()) {
+    openOnboardingWizard();
+  }
 }
 
 async function loadSessions() {
@@ -1676,6 +2008,7 @@ async function createSession() {
   await selectSession(currentSessionId);
   currentSessionOperations = [];
   currentSessionCheckpoints = payload.session.checkpoints || [];
+  currentSessionTurns = payload.session.turns || [];
   currentApprovals = [];
   currentMission = payload.session.mission || null;
   currentTasks = payload.session.tasks || [];
@@ -1683,9 +2016,13 @@ async function createSession() {
   syncSessionMetaControls();
   renderSessionOperations();
   renderSessionCheckpoints();
+  renderSessionTurns();
   renderSessionTimeline();
   renderApprovals();
   renderEventStream();
+  if (shouldOpenOnboardingWizard(payload.session)) {
+    openOnboardingWizard();
+  }
 }
 
 async function selectSession(sessionId) {
@@ -1707,12 +2044,13 @@ async function selectSession(sessionId) {
   stopSessionReplay({ render: false });
   clearSessionWorkspaceState();
   messages = session.messages || [];
-  modelSelect.value = session.model || "jarvis-safe";
+  modelSelect.value = session.model || "jarvis";
   workspaceInput.value = session.workspace || "";
   sessionTitleEl.value = session.title || "Nova conversa";
   renderMessages();
   currentSessionOperations = session.operations || [];
   currentSessionCheckpoints = session.checkpoints || [];
+  currentSessionTurns = session.turns || [];
   currentApprovals = session.approvals || [];
   currentMission = session.mission || null;
   currentTasks = session.tasks || [];
@@ -1726,8 +2064,13 @@ async function selectSession(sessionId) {
   renderApprovals();
   highlightSelectedSession();
   await restoreSessionUiState(session);
+  await applyWorkspacePresetForCurrent({ allowModelSwitch: false });
   renderWorkbenchStatus();
   renderMissionControl();
+  await loadStarterContext();
+  if (shouldOpenOnboardingWizard(session)) {
+    openOnboardingWizard();
+  }
 }
 
 function normalizeSessionMeta(meta = null) {
@@ -1832,10 +2175,54 @@ function renderSessions(sessions) {
       <span>${escapeHtml(sessionMeta)}</span>
       ${tags ? `<small>${escapeHtml(tags)}</small>` : ""}
       ${session.preview ? `<small>${escapeHtml(session.preview)}</small>` : ""}
+      <div class="session-item-actions">
+        <span class="session-item-action secondary" data-session-action="open-note" data-session-id="${escapeHtml(session.id)}">Abrir nota</span>
+        <span class="session-item-action secondary" data-session-action="resume" data-session-id="${escapeHtml(session.id)}">Retomar</span>
+        <span class="session-item-action secondary" data-session-action="sync" data-session-id="${escapeHtml(session.id)}">Sync nota</span>
+      </div>
     `;
     button.addEventListener("click", () => selectSession(session.id));
     sessionsEl.appendChild(button);
   }
+  sessionsEl.querySelectorAll("[data-session-action]").forEach((node) => {
+    node.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const sessionId = node.getAttribute("data-session-id");
+      const action = node.getAttribute("data-session-action");
+      if (!sessionId) return;
+      await selectSession(sessionId);
+      if (action === "open-note") {
+        await openCurrentSessionNote();
+        return;
+      }
+      if (action === "sync") {
+        await syncCurrentSessionNoteToObsidian();
+        return;
+      }
+      const activeTasks = currentTasks.filter((task) => task.status !== "done");
+      const latestFailedCommandEvent = [...currentEvents].reverse().find((item) => item.type === "command_executed" && item.payload?.exit_code && Number(item.payload.exit_code) !== 0);
+      const pendingApprovals = currentApprovals.filter((item) => item.status === "pending");
+      const latestCheckpoint = currentSessionCheckpoints[currentSessionCheckpoints.length - 1] || null;
+      const latestTurn = currentSessionTurns[currentSessionTurns.length - 1] || null;
+      const actionModel = buildStarterResumeAction({
+        activeEditor: getCurrentEditor(),
+        mission: normalizeMissionPayload(currentMission),
+        activeTasks: activeTasks.length,
+        latestFailedCommandEvent,
+        pendingApprovals,
+        latestCheckpoint,
+        latestTurn,
+      });
+      await executeStarterResumeAction(actionModel.kind, {
+        activeEditor: getCurrentEditor(),
+        mission: normalizeMissionPayload(currentMission),
+        latestCheckpoint,
+        latestTurn,
+        activeTasks: activeTasks.length,
+        pendingApprovals,
+      });
+    });
+  });
   highlightSelectedSession();
 }
 
@@ -1843,6 +2230,70 @@ function highlightSelectedSession() {
   for (const node of sessionsEl.querySelectorAll(".session-item")) {
     node.classList.toggle("active", node.dataset.sessionId === currentSessionId);
   }
+}
+
+async function fetchCurrentSessionNote() {
+  if (!currentSessionId) return null;
+  return api(`/api/chat/sessions/${currentSessionId}/note`);
+}
+
+async function openCurrentSessionNote() {
+  const payload = await fetchCurrentSessionNote();
+  if (!payload?.path) return;
+  await loadWorkspaceTree();
+  await openWorkspaceFile(payload.path);
+  setWorkbenchMode("build");
+  announceAssistantMessage(`Nota da sessão aberta: ${payload.path}`);
+}
+
+async function attachCurrentSessionNote() {
+  const payload = await fetchCurrentSessionNote();
+  if (!payload?.path || !payload?.content) return;
+  pendingAttachments.push({
+    id: `session-note-${currentSessionId}-${Date.now()}`,
+    name: payload.path.split("/").pop() || "session-note.md",
+    content: payload.content,
+    size: new Blob([payload.content]).size,
+  });
+  renderAttachments();
+  await appendSessionOperation({
+    kind: "session_note_attach",
+    title: "Anexou resumo da sessão",
+    path: payload.path,
+    detail: "nota markdown persistida da conversa atual",
+  });
+  announceAssistantMessage("Resumo da sessão anexado ao próximo prompt.");
+}
+
+async function syncCurrentSessionNoteToObsidian(options = {}) {
+  if (!currentSessionId) return false;
+  const workspace = (options.workspace || workspaceInput.value || "jarvis").trim() || "jarvis";
+  const payload = await api(`/api/chat/sessions/${currentSessionId}/note/sync`, {
+    method: "POST",
+    body: JSON.stringify({
+      workspace,
+      remember: options.remember !== false,
+      index: options.index !== false,
+      force: true,
+    }),
+  });
+  currentSessionOperations = payload.session?.operations || currentSessionOperations;
+  currentEvents = payload.session?.events || currentEvents;
+  renderSessionOperations();
+  renderEventStream();
+  renderMissionControl();
+  obsidianStatusEl.textContent = [
+    "Sessao atual sincronizada como nota operacional.",
+    `Workspace: ${payload.workspace}`,
+    `Memoria: ${payload.remembered ? "ok" : "ignorada"}`,
+    `RAG: ${payload.indexed ? "ok" : "ignorado"}`,
+    `Nota: ${payload.path}`,
+    `Destino: ${payload.knowledge?.stored_path || "knowledge/obsidian"}`,
+  ].join("\n");
+  if (options.announce !== false) {
+    announceAssistantMessage(`Sessão sincronizada para o workspace ${payload.workspace}.`);
+  }
+  return true;
 }
 
 function buildSessionUiStateSnapshot() {
@@ -1989,6 +2440,7 @@ async function createSessionTaskFromInputs() {
   currentEvents = payload.session.events || [];
   taskTitleEl.value = "";
   renderMissionControl();
+  renderStarterContext();
   await loadSessions();
   announceAssistantMessage(`Tarefa criada: ${title}`);
 }
@@ -2002,6 +2454,7 @@ async function updateSessionTask(taskId, patch) {
   currentTasks = payload.session.tasks || [];
   currentEvents = payload.session.events || [];
   renderMissionControl();
+  renderStarterContext();
   await loadSessions();
 }
 
@@ -2092,6 +2545,199 @@ async function persistMissionFromInputs() {
     detail: mission.objective || mission.status || "missão sem objetivo definido",
   });
   announceAssistantMessage("Missão persistida nesta sessão do Jarvis.");
+}
+
+async function persistMission(missionInput, { announce = false } = {}) {
+  if (!currentSessionId) return null;
+  const mission = normalizeMissionPayload(missionInput);
+  const payload = await api(`/api/chat/sessions/${currentSessionId}`, {
+    method: "PUT",
+    body: JSON.stringify({ mission }),
+  });
+  currentMission = payload.session.mission || mission;
+  currentTasks = payload.session.tasks || currentTasks;
+  currentEvents = payload.session.events || currentEvents;
+  renderMissionControl();
+  await loadSessions();
+  if (announce) {
+    announceAssistantMessage(`Missão preparada: ${mission.objective || mission.status || "sessão atualizada"}.`);
+  }
+  return mission;
+}
+
+function onboardingSeenKey(sessionId = currentSessionId) {
+  return `${ONBOARDING_SEEN_PREFIX}${sessionId || "unknown"}`;
+}
+
+function markOnboardingSeen(sessionId = currentSessionId) {
+  if (!sessionId) return;
+  localStorage.setItem(onboardingSeenKey(sessionId), "1");
+}
+
+function shouldOpenOnboardingWizard(session = null) {
+  const sessionId = session?.id || currentSessionId;
+  if (!sessionId) return false;
+  if (localStorage.getItem(onboardingSeenKey(sessionId)) === "1") return false;
+  if ((session?.messages || messages || []).length) return false;
+  const mission = normalizeMissionPayload(session?.mission || currentMission);
+  if (mission.objective || mission.next_steps.length) return false;
+  return true;
+}
+
+function openOnboardingWizard() {
+  if (!onboardingWizardEl) return;
+  onboardingWizardEl.classList.remove("hidden");
+  onboardingWizardEl.setAttribute("aria-hidden", "false");
+  if (onboardingModeEl && !onboardingModeEl.value) onboardingModeEl.value = "inspect-project";
+  if (onboardingWorkspaceEl) onboardingWorkspaceEl.value = workspaceInput.value.trim() || "jarvis";
+  if (onboardingGoalEl && !onboardingGoalEl.value.trim()) onboardingGoalEl.value = "";
+  if (onboardingTargetPathEl && !onboardingTargetPathEl.value.trim()) onboardingTargetPathEl.value = resolveQuickTargetPath() || "";
+  window.setTimeout(() => {
+    onboardingGoalEl?.focus();
+  }, 0);
+}
+
+function closeOnboardingWizard() {
+  if (!onboardingWizardEl) return;
+  onboardingWizardEl.classList.add("hidden");
+  onboardingWizardEl.setAttribute("aria-hidden", "true");
+}
+
+async function updateSessionWorkspace(workspace) {
+  const normalized = String(workspace || "").trim() || null;
+  workspaceInput.value = normalized || "";
+  await applyWorkspacePresetForCurrent({ allowModelSwitch: true });
+  if (!currentSessionId) return;
+  await api(`/api/chat/sessions/${currentSessionId}`, {
+    method: "PUT",
+    body: JSON.stringify({ workspace: normalized }),
+  });
+  await loadSessions();
+}
+
+async function submitOnboardingWizard() {
+  const kind = onboardingModeEl?.value || "inspect-project";
+  const workspace = (onboardingWorkspaceEl?.value || workspaceInput.value || "jarvis").trim() || "jarvis";
+  const goal = (onboardingGoalEl?.value || "").trim() || null;
+  const targetPath = (onboardingTargetPathEl?.value || "").trim() || null;
+  await updateSessionWorkspace(workspace);
+  if (quickTargetPathEl) quickTargetPathEl.value = targetPath || quickTargetPathEl.value || "";
+  if (quickGoalEl) quickGoalEl.value = goal || quickGoalEl.value || "";
+  markOnboardingSeen();
+  closeOnboardingWizard();
+  await startGettingStartedFlow(kind, { workspace, goal, targetPath });
+}
+
+async function ensureStarterTerminalReady() {
+  if (!terminalSessionId) {
+    await createTerminalSession();
+    return;
+  }
+  if (!terminalSessions.some((session) => session.session_id === terminalSessionId)) {
+    await createTerminalSession();
+  }
+}
+
+async function startGettingStartedFlow(kind, options = {}) {
+  const workspace = (options.workspace || workspaceInput.value || "jarvis").trim() || "jarvis";
+  const active = getCurrentEditor();
+  const goalOverride = (options.goal || "").trim() || null;
+  const targetPathOverride = (options.targetPath || "").trim() || null;
+  await ensureStarterTerminalReady();
+
+  if (kind === "inspect-project") {
+    await setPreferredModel("jarvis-programador");
+    await persistMission(
+      {
+        objective: goalOverride || `entender o workspace ${workspace} e sugerir o melhor proximo passo`,
+        status: "planejando",
+        next_steps: [
+          "mapear o estado atual do projeto",
+          "identificar gargalos ou faltas",
+          "propor a proxima acao de maior impacto",
+        ],
+      },
+      { announce: false },
+    );
+    primePrompt(
+      `${goalOverride ? `${goalOverride}.` : `Analise o workspace ${workspace} como meu parceiro tecnico.`} Resuma o que ja existe, aponte o maior gargalo atual e proponha a melhor proxima acao objetiva.${active ? ` Considere especialmente o arquivo ${active.path}.` : ""}`,
+      { mode: "chat", activeFile: Boolean(active), terminal: true, search: true },
+    );
+    announceAssistantMessage("Fluxo inicial preparado para entender o projeto. Revise o prompt e clique em `Jarvis agir` ou `Chat`.");
+    return;
+  }
+
+  if (kind === "fix-error") {
+    await setPreferredModel("jarvis-programador");
+    await persistMission(
+      {
+        objective: goalOverride || "reproduzir, explicar e corrigir o erro atual do terminal",
+        status: "executando",
+        next_steps: [
+          "rodar ou repetir o comando com falha",
+          "analisar a saida recente do terminal",
+          "aplicar a menor correcao segura",
+        ],
+      },
+      { announce: false },
+    );
+    await setQuickFlowMode("fix-terminal");
+    terminalCommandEl.focus();
+    if (terminalBuffer.trim()) {
+      await preparePromptForTerminalFix();
+      announceAssistantMessage("Fluxo de correcao preparado com a saida atual do terminal. Clique em `Jarvis agir` para diagnosticar.");
+    } else {
+      primePrompt("Vou diagnosticar o erro assim que houver saida recente do terminal. Rode o comando com falha e depois clique em `Jarvis agir`.", { mode: "review", activeFile: Boolean(active), terminal: true });
+      announceAssistantMessage("Terminal pronto. Rode o comando com problema e depois use `Jarvis agir`.");
+    }
+    return;
+  }
+
+  if (kind === "create-file") {
+    await setPreferredModel("jarvis-programador");
+    await persistMission(
+      {
+        objective: goalOverride || "criar ou iniciar um novo arquivo com uma primeira versao funcional",
+        status: "planejando",
+        next_steps: [
+          "definir caminho do arquivo",
+          "definir objetivo funcional",
+          "gerar a primeira implementacao",
+        ],
+      },
+      { announce: false },
+    );
+    const path = targetPathOverride || resolveQuickTargetPath();
+    const goal = goalOverride || resolveQuickGoal("create");
+    if (path) {
+      if (quickTargetPathEl) quickTargetPathEl.value = path;
+      if (quickGoalEl) quickGoalEl.value = goal;
+      await setQuickFlowMode("create");
+      await ensureWorkspaceFile(path);
+      primePrompt(buildQuickFlowPrompt("create"), resolveQuickFlowConfig("create").context);
+      announceAssistantMessage(`Fluxo de criacao preparado para ${path}. Revise o prompt e clique em \`Jarvis agir\`.`);
+    } else {
+      await preparePromptForCreateFile();
+    }
+    return;
+  }
+
+  if (kind === "next-step") {
+    await persistMission(
+      {
+        objective: goalOverride || `descobrir o proximo passo de maior impacto no workspace ${workspace}`,
+        status: "planejando",
+        next_steps: [
+          "considerar contexto atual",
+          "ponderar risco e impacto",
+          "sugerir uma unica proxima acao",
+        ],
+      },
+      { announce: false },
+    );
+    preparePromptForNextStep();
+    announceAssistantMessage("Pronto. O Jarvis preparou um prompt para decidir o melhor proximo passo.");
+  }
 }
 
 function buildMissionModel() {
@@ -2253,14 +2899,23 @@ function renderMissionControl() {
     missionNextActionsEl.appendChild(button);
   });
   renderTaskBoard();
+  renderStarterContext();
 }
 
 function buildCommandPaletteItems() {
   const active = getCurrentEditor();
   const workspace = workspaceInput.value.trim() || "jarvis";
   const items = [
+    { label: "Assistente guiado de inicio", description: "Abre um wizard curto para preparar a sessao inicial", keywords: ["start", "wizard", "guided", "onboarding"], action: async () => { openOnboardingWizard(); } },
+    { label: "Comecar agora: entender projeto", description: "Prepara terminal, missao e primeiro prompt para mapear o workspace atual", keywords: ["start", "starter", "onboarding", "inspect", "workspace"], action: async () => { await startGettingStartedFlow("inspect-project"); } },
+    { label: "Comecar agora: corrigir erro", description: "Prepara o modo de diagnostico de terminal e a missao inicial", keywords: ["start", "starter", "error", "terminal", "debug"], action: async () => { await startGettingStartedFlow("fix-error"); } },
     { label: "Abrir arquivo", description: "Solicita um caminho e abre no editor", keywords: ["open", "arquivo", "editor"], action: async () => { openPathButton.click(); setWorkbenchMode("build"); } },
     { label: "Criar arquivo", description: "Cria um arquivo e prepara o Jarvis para implementar", keywords: ["new", "criar", "file", "jarvis"], action: async () => { await preparePromptForCreateFile(); } },
+    { label: "Abrir nota da sessão", description: "Abre no editor o snapshot Markdown da conversa atual", keywords: ["session", "note", "markdown", "obsidian"], action: async () => { await openCurrentSessionNote(); setWorkbenchMode("build"); } },
+    { label: "Anexar resumo da sessão", description: "Leva a nota persistida da conversa atual para o próximo prompt", keywords: ["session", "attach", "summary", "note"], action: async () => { await attachCurrentSessionNote(); } },
+    { label: "Sincronizar sessão para memória/RAG", description: "Transforma a conversa atual em nota operacional útil no workspace", keywords: ["session", "sync", "obsidian", "rag", "memory"], action: async () => { await syncCurrentSessionNoteToObsidian(); } },
+    { label: "Salvar preset do workspace", description: "Guarda perfil, modo, fluxo e contexto para este workspace", keywords: ["workspace", "preset", "save", "quality"], action: async () => { await saveWorkspacePreset(); } },
+    { label: "Aplicar preset do workspace", description: "Restaura preferências operacionais do workspace atual", keywords: ["workspace", "preset", "apply", "restore"], action: async () => { await applyWorkspacePresetForCurrent({ announce: true, allowModelSwitch: true }); } },
     { label: "Fluxo rápido: abrir/criar alvo", description: resolveQuickTargetPath() || "Usa o alvo do cockpit rápido", keywords: ["quick", "target", "codex", "arquivo"], action: async () => { await openQuickFlowTarget(); } },
     { label: "Fluxo rápido: pedir ao Jarvis", description: "Gera prompt com intenção, alvo e objetivo atuais", keywords: ["quick", "prompt", "codex", "jarvis"], action: async () => { await runQuickFlowPrompt(); } },
     { label: "Jarvis agir no workspace", description: "Usa o prompt atual para gerar diff, comando e fila operacional", keywords: ["delegate", "codex", "workspace", "apply"], action: async () => { await submitWorkspaceChatPrompt(); } },
@@ -2376,6 +3031,11 @@ function setWorkbenchMode(mode, options = {}) {
   }
   if (options.syncSession !== false) {
     scheduleSessionUiStateSave();
+  }
+  if (options.autoModel !== false) {
+    syncAdaptiveModel({ mode: normalized, quickFlow: quickFlowMode }).catch((error) => {
+      console.warn("jarvis adaptive model sync failed", error);
+    });
   }
   renderWorkbenchStatus();
 }
@@ -2495,6 +3155,15 @@ function loadQuickFlowMode() {
   }
 }
 
+function resolveAdaptiveModel({ mode = workbenchMode, quickFlow = quickFlowMode } = {}) {
+  if (!currentAutoProfile()) return null;
+  let family = "general";
+  if (quickFlow === "research") family = "pesquisador";
+  else if (["create", "implement", "fix-terminal", "review"].includes(quickFlow)) family = "programador";
+  else if (mode === "build" || mode === "review") family = "programador";
+  return resolveQualityAwareModel(family, currentQualityFirst());
+}
+
 async function setPreferredModel(model) {
   if (!model || modelSelect.value === model) return;
   modelSelect.value = model;
@@ -2504,6 +3173,83 @@ async function setPreferredModel(model) {
       body: JSON.stringify({ model }),
     });
     await loadSessions();
+  }
+  renderWorkspacePresetStatus();
+}
+
+async function syncAdaptiveModel(options = {}) {
+  const model = resolveAdaptiveModel(options);
+  if (!model) {
+    renderWorkspacePresetStatus();
+    return null;
+  }
+  await setPreferredModel(model);
+  return model;
+}
+
+function buildCurrentWorkspacePreset() {
+  return normalizeWorkspacePreset({
+    qualityFirst: currentQualityFirst(),
+    autoProfile: currentAutoProfile(),
+    preferredModel: modelSelect.value || null,
+    workbenchMode,
+    quickFlowMode,
+    terminalCwd: (terminalCwdEl?.value || "").trim() || null,
+    contextPrefs: {
+      activeFile: contextActiveFileCheckbox.checked,
+      openTabs: contextOpenTabsCheckbox.checked,
+      terminal: contextTerminalCheckbox.checked,
+      search: contextSearchCheckbox.checked,
+    },
+    updatedAt: new Date().toISOString(),
+  });
+}
+
+async function applyWorkspacePresetForCurrent({ announce = false, allowModelSwitch = false } = {}) {
+  const preset = getCurrentWorkspacePreset();
+  if (workspaceQualityFirstCheckbox) workspaceQualityFirstCheckbox.checked = preset.qualityFirst;
+  if (workspaceAutoProfileCheckbox) workspaceAutoProfileCheckbox.checked = preset.autoProfile;
+  if (preset.terminalCwd && terminalCwdEl && !terminalCwdEl.value.trim()) {
+    terminalCwdEl.value = preset.terminalCwd;
+  }
+  contextActiveFileCheckbox.checked = preset.contextPrefs.activeFile;
+  contextOpenTabsCheckbox.checked = preset.contextPrefs.openTabs;
+  contextTerminalCheckbox.checked = preset.contextPrefs.terminal;
+  contextSearchCheckbox.checked = preset.contextPrefs.search;
+  persistContextPrefs();
+  if (preset.workbenchMode) {
+    setWorkbenchMode(preset.workbenchMode, { persist: false, autoModel: false });
+  }
+  if (preset.quickFlowMode) {
+    await setQuickFlowMode(preset.quickFlowMode, { persist: false, autoModel: false });
+  } else {
+    syncQuickFlowUi();
+  }
+  if (allowModelSwitch) {
+    if (preset.autoProfile) {
+      await syncAdaptiveModel();
+    } else if (preset.preferredModel) {
+      await setPreferredModel(resolveQualityAwareModel(preset.preferredModel, preset.qualityFirst));
+    }
+  }
+  renderComposerContextPreview();
+  renderWorkbenchStatus();
+  renderWorkspacePresetStatus();
+  if (announce) {
+    const workspace = String(workspaceInput?.value || "").trim() || "padrão";
+    announceAssistantMessage(`Preset aplicado para o workspace ${workspace}.`);
+  }
+}
+
+async function saveWorkspacePreset({ announce = true } = {}) {
+  const preset = buildCurrentWorkspacePreset();
+  const key = getWorkspacePresetKey();
+  workspacePresets[key] = preset;
+  persistWorkspacePresets();
+  renderWorkspacePresetStatus();
+  if (announce) {
+    const workspace = String(workspaceInput?.value || "").trim() || "padrão";
+    announceAssistantMessage(`Preset salvo para o workspace ${workspace}.`);
   }
 }
 
@@ -2544,7 +3290,13 @@ async function setQuickFlowMode(mode, options = {}) {
   if (quickGoalEl && !quickGoalEl.value.trim()) {
     quickGoalEl.value = config.defaultGoal;
   }
-  await setPreferredModel(config.model);
+  if (options.autoModel !== false) {
+    if (currentAutoProfile()) {
+      await syncAdaptiveModel({ quickFlow: quickFlowMode, mode: workbenchMode });
+    } else {
+      await setPreferredModel(resolveQualityAwareModel(config.model, currentQualityFirst()));
+    }
+  }
   syncQuickFlowUi();
 }
 
@@ -2715,6 +3467,8 @@ function renderWorkbenchStatus() {
     partnerHint,
     `modo ${workbenchMode}`,
     `perfil ${modelSelect.value || "jarvis-safe"}`,
+    currentQualityFirst() ? "qualidade" : "mais leve",
+    currentAutoProfile() ? "perfil auto" : "perfil manual",
     `sessão ${currentSessionId ? currentSessionId.slice(0, 6) : "nova"}`,
     `workspace ${workspaceInput.value.trim() || "none"}`,
     active ? `arquivo ${active.path}` : "sem arquivo",
@@ -2876,7 +3630,7 @@ function renderMessages() {
   messagesEl.innerHTML = "";
   const sourceMessages = replayMode ? replaySourceMessages.slice(0, replayIndex) : messages;
   if (!sourceMessages.length) {
-    appendMessageElement("assistant", replayMode ? "Replay iniciado. Aguardando primeira mensagem..." : "Jarvis pronto. Escolha um perfil e envie sua mensagem.");
+    appendMessageElement("assistant", replayMode ? "Replay iniciado. Aguardando primeira mensagem..." : buildEmptySessionBriefing());
     renderWorkbenchStatus();
     return;
   }
@@ -2894,6 +3648,29 @@ function formatMessageMetadata(metadata) {
   if (metadata.primary_model) parts.push(`modelo: ${metadata.primary_model}`);
   if (metadata.workspace) parts.push(`workspace: ${metadata.workspace}`);
   return parts.join(" | ");
+}
+
+function buildEmptySessionBriefing() {
+  const workspace = workspaceInput.value.trim() || "jarvis";
+  const terminalLabel = terminalSessionId ? `terminal pronto (${terminalSessionId.slice(0, 6)})` : "terminal ainda nao iniciado";
+  return [
+    "Jarvis pronto para trabalhar neste workspace local.",
+    "",
+    `Workspace atual: ${workspace}`,
+    `Perfil atual: ${modelSelect.value || "jarvis-safe"}`,
+    `Estado do terminal: ${terminalLabel}`,
+    "",
+    "Comece de um destes jeitos:",
+    "1. Use o painel `Comecar Agora` acima.",
+    "2. Clique em `Jarvis agir` para um fluxo operacional com arquivo e terminal.",
+    "3. Use `Chat` para pedir analise, plano ou explicacao.",
+    "",
+    "Atalhos uteis:",
+    "- `/help` abre o guia completo",
+    "- `/open caminho/do/arquivo` abre um arquivo no editor",
+    "- `/run comando` executa algo no terminal embutido",
+    "- `/fix-terminal` prepara o fluxo de diagnostico",
+  ].join("\n");
 }
 
 function renderAttachments() {
@@ -3661,6 +4438,47 @@ async function queueApproval(request) {
   return payload.approval;
 }
 
+function applyApprovalEffects(approval, result) {
+  if (!approval) return;
+  if (result?.output) {
+    terminalBuffer += `
+[jarvis approval]
+${result.output}
+`;
+    if (terminalSessionId) terminalBuffers[terminalSessionId] = terminalBuffer;
+    renderTerminal();
+  }
+  if (approval.kind === "file_edit") {
+    const updatedPath = approval.path || approval.payload?.path;
+    if (updatedPath) {
+      const openEditor = openEditors.find((item) => item.path === updatedPath);
+      const proposed = approval.payload?.proposed_content;
+      if (openEditor && typeof proposed === "string") {
+        openEditor.content = proposed;
+        openEditor.dirty = false;
+        if (currentOpenFilePath === updatedPath) fileEditorEl.value = proposed;
+        renderEditorTabs();
+        syncEditorHeader();
+      }
+    }
+  }
+  if (approval.kind === "batch_edit") {
+    const files = Array.isArray(approval.payload?.files) ? approval.payload.files : [];
+    for (const item of files) {
+      const updatedPath = item?.path;
+      const proposed = item?.proposed_content;
+      if (!updatedPath || typeof proposed !== "string") continue;
+      const openEditor = openEditors.find((editor) => editor.path === updatedPath);
+      if (!openEditor) continue;
+      openEditor.content = proposed;
+      openEditor.dirty = false;
+      if (currentOpenFilePath === updatedPath) fileEditorEl.value = proposed;
+    }
+    renderEditorTabs();
+    syncEditorHeader();
+  }
+}
+
 async function actOnApproval(approvalId, action) {
   if (!currentSessionId) return;
   const payload = await api(`/api/chat/sessions/${currentSessionId}/approvals/${approvalId}`, {
@@ -3669,33 +4487,45 @@ async function actOnApproval(approvalId, action) {
   });
   currentApprovals = payload.session.approvals || [];
   currentSessionOperations = payload.session.operations || currentSessionOperations;
+  currentEvents = payload.session.events || currentEvents;
   renderApprovals();
   renderSessionOperations();
+  renderEventStream();
+  renderStarterContext();
   if (action === "apply") {
-    if (payload.result?.output) {
-      terminalBuffer += `
-[jarvis approval]
-${payload.result.output}
-`;
-      if (terminalSessionId) terminalBuffers[terminalSessionId] = terminalBuffer;
-      renderTerminal();
-    }
-    if (payload.approval?.kind === "file_edit") {
-      const updatedPath = payload.approval.path || payload.approval.payload?.path;
-      if (updatedPath) {
-        const openEditor = openEditors.find((item) => item.path === updatedPath);
-        const proposed = payload.approval.payload?.proposed_content;
-        if (openEditor && typeof proposed === "string") {
-          openEditor.content = proposed;
-          openEditor.dirty = false;
-          if (currentOpenFilePath === updatedPath) fileEditorEl.value = proposed;
-          renderEditorTabs();
-          syncEditorHeader();
-        }
-      }
-    }
+    applyApprovalEffects(payload.approval, payload.result);
   }
   announceAssistantMessage(action === "apply" ? "Ação aplicada na fila do Jarvis." : "Ação rejeitada na fila do Jarvis.");
+}
+
+async function actOnPendingApprovals(action) {
+  if (!currentSessionId) return;
+  const pending = currentApprovals.filter((approval) => approval.status === "pending");
+  if (!pending.length) {
+    announceAssistantMessage("Não há ações pendentes na fila do Jarvis.");
+    return;
+  }
+  const payload = await api(`/api/chat/sessions/${currentSessionId}/approvals/batch`, {
+    method: "POST",
+    body: JSON.stringify({ action, pending_only: true }),
+  });
+  currentApprovals = payload.session.approvals || [];
+  currentSessionOperations = payload.session.operations || currentSessionOperations;
+  currentEvents = payload.session.events || currentEvents;
+  renderApprovals();
+  renderSessionOperations();
+  renderEventStream();
+  renderStarterContext();
+  if (action === "apply") {
+    for (const item of payload.results || []) {
+      applyApprovalEffects(item.approval, item.result);
+    }
+  }
+  announceAssistantMessage(
+    action === "apply"
+      ? `${payload.count || 0} ação(ões) pendente(s) aplicadas pela fila do Jarvis.`
+      : `${payload.count || 0} ação(ões) pendente(s) rejeitadas pela fila do Jarvis.`,
+  );
 }
 
 async function queueSuggestedCommandApproval() {
@@ -4332,13 +5162,292 @@ function appendMessageElement(role, content, metadata = null, attachments = []) 
 async function loadStatus() {
   try {
     const status = await api("/api/status", { auth: false });
+    latestStatus = status;
     const ollama = status.ollama?.status ?? "unknown";
     const qdrant = status.qdrant?.status ?? "unknown";
     const strategy = status.core?.model_selection_strategy ?? "unknown";
     statusEl.textContent = `core: ok\nstrategy: ${strategy}\nollama: ${ollama}\nqdrant: ${qdrant}`;
+    renderStarterReadiness();
   } catch (error) {
+    latestStatus = null;
     statusEl.textContent = `Erro: ${error.message}`;
+    renderStarterReadiness(error);
   }
+}
+
+function renderStarterReadiness(error = null) {
+  if (!starterReadinessEl) return;
+  if (error) {
+    starterReadinessEl.innerHTML = '<div class="starter-readiness-card"><strong>Prontidao</strong><span>Falha ao carregar o estado local do Jarvis.</span></div>';
+    return;
+  }
+  if (!latestStatus) {
+    starterReadinessEl.innerHTML = '<div class="starter-readiness-card"><strong>Prontidao</strong><span>Carregando ambiente local...</span></div>';
+    return;
+  }
+
+  const ollamaModels = Array.isArray(latestStatus.ollama?.models) ? latestStatus.ollama.models.length : 0;
+  const collections = Number(latestStatus.qdrant?.collections || 0);
+  const identityFacts = Number(latestStatus.memory?.identity_facts || 0);
+  const stateFacts = Number(latestStatus.memory?.state_facts || 0);
+  const benchmarkStatus = latestStatus.models?.benchmark_status || "unknown";
+  const strategy = latestStatus.core?.model_selection_strategy || "unknown";
+
+  const cards = [
+    {
+      label: "Core",
+      value: latestStatus.core?.status === "ok" ? `roteador pronto (${strategy})` : "roteador indisponivel",
+    },
+    {
+      label: "Modelos",
+      value: latestStatus.ollama?.status === "ok" ? `${ollamaModels} modelo(s) visivel(is)` : "ollama com falha",
+    },
+    {
+      label: "Memoria",
+      value: latestStatus.memory?.status === "ok" ? `${identityFacts} fatos de identidade, ${stateFacts} de estado` : "memoria com falha",
+    },
+    {
+      label: "Conhecimento",
+      value: latestStatus.qdrant?.status === "ok" ? `${collections} colecao(oes) no vetor local` : "qdrant com falha",
+    },
+    {
+      label: "Benchmark",
+      value: benchmarkStatus === "ready" ? "rankings prontos para roteamento" : `status: ${benchmarkStatus}`,
+    },
+  ];
+
+  starterReadinessEl.innerHTML = cards
+    .map((card) => `<div class="starter-readiness-card"><strong>${escapeHtml(card.label)}</strong><span>${escapeHtml(card.value)}</span></div>`)
+    .join("");
+}
+
+async function loadStarterContext() {
+  const workspace = workspaceInput.value.trim();
+  const query = workspace ? `?workspace=${encodeURIComponent(workspace)}` : "";
+  try {
+    const payload = await api(`/api/memory/context${query}`);
+    latestMemoryContext = payload;
+    renderStarterContext();
+  } catch {
+    latestMemoryContext = null;
+    renderStarterContext();
+  }
+}
+
+function renderStarterContext() {
+  if (!starterContextEl) return;
+  if (!latestMemoryContext) {
+    starterContextEl.innerHTML = '<div class="starter-context-card"><strong>Contexto</strong><span>Memoria e workspace ainda nao carregados.</span></div>';
+    return;
+  }
+
+  const workspaceFacts = Object.keys(latestMemoryContext.context?.workspace?.facts || {}).length;
+  const identityFacts = Object.keys(latestMemoryContext.context?.identity || {}).length;
+  const stateFacts = Object.keys(latestMemoryContext.context?.state || {}).length;
+  const activeSession = allSessions.find((session) => session.id === currentSessionId) || null;
+  const activeTasks = Number(activeSession?.active_tasks || currentTasks.filter((task) => task.status !== "done").length || 0);
+  const checkpointCount = Number(activeSession?.checkpoint_count || currentSessionCheckpoints.length || 0);
+  const turnCount = Number(activeSession?.turn_count || currentSessionTurns.length || 0);
+  const mission = normalizeMissionPayload(currentMission);
+  const openWorkspace = workspaceInput.value.trim() || "jarvis";
+  const latestOperation = currentSessionOperations.length ? currentSessionOperations[currentSessionOperations.length - 1] : null;
+  const latestCheckpoint = currentSessionCheckpoints.length ? currentSessionCheckpoints[currentSessionCheckpoints.length - 1] : null;
+  const latestTurn = currentSessionTurns.length ? currentSessionTurns[currentSessionTurns.length - 1] : null;
+  const latestCommandEvent = [...currentEvents].reverse().find((item) => item?.type === "command_executed");
+  const latestFailedCommandEvent = [...currentEvents].reverse().find((item) => item?.type === "command_executed" && Number(item?.payload?.exit_code ?? 0) !== 0);
+  const activeEditor = getCurrentEditor();
+  const pendingApprovals = currentApprovals.filter((item) => item.status === "pending");
+  const resumeAction = buildStarterResumeAction({
+    activeEditor,
+    mission,
+    activeTasks,
+    latestFailedCommandEvent,
+    pendingApprovals,
+    latestCheckpoint,
+    latestTurn,
+  });
+
+  const cards = [
+    {
+      label: "Memoria pessoal",
+      value: `${identityFacts} fatos de identidade e ${stateFacts} fatos de estado carregados`,
+    },
+    {
+      label: "Workspace atual",
+      value: `${openWorkspace} com ${workspaceFacts} fato(s) de memoria de workspace`,
+    },
+    {
+      label: "Missao ativa",
+      value: mission.objective || "nenhum objetivo persistido nesta sessao",
+    },
+    {
+      label: "Ciclo operacional",
+      value: `${activeTasks} tarefa(s), ${checkpointCount} checkpoint(s), ${turnCount} turno(s)`,
+    },
+    {
+      label: "Ultima acao",
+      value: latestOperation ? [latestOperation.title || latestOperation.kind || "acao", latestOperation.path || latestOperation.command || latestOperation.detail || null].filter(Boolean).join(" · ") : "nenhuma acao operacional registrada ainda",
+    },
+    {
+      label: "Ultimo comando",
+      value: latestCommandEvent ? [latestCommandEvent.payload?.command || "comando", latestCommandEvent.payload?.exit_code !== undefined ? `exit ${latestCommandEvent.payload.exit_code}` : null].filter(Boolean).join(" · ") : "nenhum comando recente registrado",
+    },
+    {
+      label: "Ultimo erro",
+      value: latestFailedCommandEvent ? [latestFailedCommandEvent.payload?.command || "comando com falha", `exit ${latestFailedCommandEvent.payload?.exit_code}`].filter(Boolean).join(" · ") : "nenhum erro recente de terminal registrado",
+      action: latestFailedCommandEvent ? { kind: "diagnose-terminal", id: "latest-terminal-error", label: "Diagnosticar erro" } : null,
+    },
+    {
+      label: "Retomar trabalho",
+      value: resumeAction.detail,
+      action: { kind: "resume-work", id: resumeAction.kind, label: resumeAction.label },
+    },
+    {
+      label: "Retomar de checkpoint",
+      value: latestCheckpoint ? [latestCheckpoint.title || "checkpoint", latestCheckpoint.summary || latestCheckpoint.active_file || latestCheckpoint.created_at || null].filter(Boolean).join(" · ") : "nenhum checkpoint criado ainda",
+      action: latestCheckpoint ? { kind: "checkpoint", id: latestCheckpoint.id, label: "Restaurar checkpoint" } : null,
+    },
+    {
+      label: "Retomar de turno",
+      value: latestTurn ? [latestTurn.title || "turno", latestTurn.summary || latestTurn.path || latestTurn.created_at || null].filter(Boolean).join(" · ") : "nenhum turno operacional salvo ainda",
+      action: latestTurn ? { kind: "turn", id: latestTurn.id, label: "Restaurar turno" } : null,
+    },
+  ];
+
+  starterContextEl.innerHTML = cards
+    .map((card) => `
+      <div class="starter-context-card">
+        <strong>${escapeHtml(card.label)}</strong>
+        <span>${escapeHtml(card.value)}</span>
+        ${card.action ? `<div class="starter-context-actions"><button type="button" class="secondary" data-starter-action="${escapeHtml(card.action.kind)}" data-starter-id="${escapeHtml(card.action.id)}">${escapeHtml(card.action.label)}</button></div>` : ""}
+      </div>
+    `)
+    .join("");
+
+  starterContextEl.querySelectorAll("[data-starter-action]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const kind = button.getAttribute("data-starter-action");
+      const id = button.getAttribute("data-starter-id");
+      if (!id) return;
+      if (kind === "checkpoint") {
+        await restoreSessionCheckpoint(id);
+        return;
+      }
+      if (kind === "turn") {
+        await restoreSessionTurn(id);
+        return;
+      }
+      if (kind === "diagnose-terminal") {
+        await preparePromptForTerminalFix();
+        return;
+      }
+      if (kind === "resume-work") {
+        await executeStarterResumeAction(id, {
+          activeEditor,
+          mission,
+          latestCheckpoint,
+          latestTurn,
+          activeTasks,
+          pendingApprovals,
+        });
+      }
+    });
+  });
+}
+
+function buildStarterResumeAction({ activeEditor, mission, activeTasks, latestFailedCommandEvent, pendingApprovals, latestCheckpoint, latestTurn }) {
+  if (latestFailedCommandEvent) {
+    return {
+      kind: "fix-error",
+      label: "Diagnosticar erro",
+      detail: "Ha um erro recente de terminal. Retome pelo diagnostico da ultima falha.",
+    };
+  }
+  if (pendingApprovals.length) {
+    return {
+      kind: "review-queue",
+      label: "Revisar fila",
+      detail: `${pendingApprovals.length} acao(oes) pendente(s) aguardando decisao.`,
+    };
+  }
+  if (activeTasks) {
+    return {
+      kind: "continue-task",
+      label: "Continuar tarefa",
+      detail: `${activeTasks} tarefa(s) ativa(s). Foque na proxima fase do ciclo operacional.`,
+    };
+  }
+  if (latestTurn) {
+    return {
+      kind: "restore-turn",
+      label: "Restaurar ultimo turno",
+      detail: "Existe um turno operacional recente salvo para retomar o contexto.",
+    };
+  }
+  if (latestCheckpoint) {
+    return {
+      kind: "restore-checkpoint",
+      label: "Restaurar checkpoint",
+      detail: "Existe um checkpoint recente pronto para restaurar o estado de trabalho.",
+    };
+  }
+  if (activeEditor) {
+    return {
+      kind: "next-step",
+      label: "Pedir proximo passo",
+      detail: `Continuar em ${activeEditor.path} com uma proxima acao sugerida.`,
+    };
+  }
+  if (mission.objective) {
+    return {
+      kind: "briefing",
+      label: "Retomar pela missao",
+      detail: `Missao ativa: ${mission.objective}`,
+    };
+  }
+  return {
+    kind: "inspect-project",
+    label: "Entender projeto",
+    detail: "Nenhum fluxo ativo claro. O melhor proximo passo e mapear o estado atual do workspace.",
+  };
+}
+
+async function executeStarterResumeAction(kind, context = {}) {
+  if (kind === "fix-error") {
+    await preparePromptForTerminalFix();
+    return;
+  }
+  if (kind === "review-queue") {
+    setWorkbenchMode("review");
+    announceAssistantMessage("Modo review ativado para decidir a fila pendente do Jarvis.");
+    return;
+  }
+  if (kind === "continue-task") {
+    const active = getCurrentEditor();
+    if (active) {
+      primePrompt(`Continue a tarefa atual em ${active.path}. Considere a missao ativa, o estado do workspace e proponha a proxima acao objetiva.`, { mode: "build", activeFile: true, terminal: true, search: true });
+    } else {
+      primePrompt(buildMissionPrompt(), { mode: "chat", activeFile: false, terminal: true, search: true });
+    }
+    return;
+  }
+  if (kind === "restore-turn" && context.latestTurn?.id) {
+    await restoreSessionTurn(context.latestTurn.id);
+    return;
+  }
+  if (kind === "restore-checkpoint" && context.latestCheckpoint?.id) {
+    await restoreSessionCheckpoint(context.latestCheckpoint.id);
+    return;
+  }
+  if (kind === "next-step") {
+    preparePromptForNextStep();
+    return;
+  }
+  if (kind === "briefing") {
+    primePrompt(buildMissionPrompt(), { mode: "chat", activeFile: Boolean(context.activeEditor), terminal: true, search: true });
+    return;
+  }
+  await startGettingStartedFlow("inspect-project");
 }
 
 function setPending(pending) {
@@ -4445,8 +5554,27 @@ async function streamSessionMessage({ sessionId, model, content, displayContent,
   return finalPayload;
 }
 
-async function runWorkspaceSessionTurn({ sessionId, model, content, displayContent, workspace, path = null, fileContent = null, terminalOutput = null, attachments = [] }) {
-  const response = await fetch(`/api/chat/sessions/${sessionId}/workspace-turn`, {
+async function streamWorkspaceSessionTurn({ sessionId, model, content, displayContent, workspace, path = null, fileContent = null, terminalOutput = null, attachments = [] }) {
+  const userMessage = {
+    role: "user",
+    content,
+    display_content: displayContent,
+    attachments,
+  };
+  messages.push(userMessage);
+  const assistantMessage = {
+    role: "assistant",
+    content: "Jarvis analisando o workspace...\n",
+    metadata: null,
+  };
+  messages.push(assistantMessage);
+  renderMessages();
+
+  const assistantNode = messagesEl.lastElementChild;
+  const assistantBody = assistantNode?.querySelector(".message-body");
+  const assistantMeta = assistantNode?.querySelector(".message-meta");
+
+  const response = await fetch(`/api/chat/sessions/${sessionId}/workspace-turn/stream`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -4465,10 +5593,74 @@ async function runWorkspaceSessionTurn({ sessionId, model, content, displayConte
       queue_edit: true,
     }),
   });
-  if (!response.ok) {
+  if (!response.ok || !response.body) {
     throw new Error(`HTTP ${response.status}`);
   }
-  return response.json();
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let finalPayload = null;
+  let isStreamingBody = false;
+
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const events = buffer.split("\n\n");
+    buffer = events.pop() || "";
+    for (const event of events) {
+      const trimmed = event.trim();
+      if (!trimmed.startsWith("data:")) continue;
+      const payloadText = trimmed.slice(5).trim();
+      if (payloadText === "[DONE]") continue;
+      const payload = JSON.parse(payloadText);
+      if (payload.type === "start") {
+        assistantMessage.metadata = payload.assistant_metadata || null;
+        if (assistantMeta) {
+          const metaLine = formatMessageMetadata(assistantMessage.metadata);
+          if (metaLine) assistantMeta.textContent = metaLine;
+        }
+        continue;
+      }
+      if (payload.type === "phase") {
+        const lines = [];
+        if (payload.label) lines.push(payload.label);
+        if (payload.summary) lines.push(payload.summary);
+        if (typeof payload.queued_approvals === "number") lines.push(`Ações em fila: ${payload.queued_approvals}`);
+        assistantMessage.content = `${lines.join("\n")}\n`;
+        if (assistantBody) {
+          assistantBody.textContent = assistantMessage.content;
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+        continue;
+      }
+      if (payload.type === "chunk") {
+        if (!isStreamingBody) {
+          assistantMessage.content = "";
+          isStreamingBody = true;
+        }
+        assistantMessage.content += payload.delta || "";
+        if (assistantBody) {
+          assistantBody.textContent = assistantMessage.content;
+          messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+        continue;
+      }
+      if (payload.type === "done") {
+        finalPayload = payload;
+        continue;
+      }
+      if (payload.type === "error") {
+        throw new Error(payload.detail || "Erro desconhecido no stream operacional.");
+      }
+    }
+  }
+
+  if (!finalPayload) {
+    throw new Error("Stream operacional finalizado sem payload final.");
+  }
+  return finalPayload;
 }
 
 async function registerServiceWorker() {
@@ -5149,3 +6341,7 @@ function exportCurrentSessionMarkdown() {
   anchor.remove();
   URL.revokeObjectURL(url);
 }
+
+bootstrap().catch((error) => {
+  statusEl.textContent = `Erro ao inicializar: ${error.message}`;
+});

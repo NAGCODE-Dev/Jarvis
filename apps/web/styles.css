@@ -123,6 +123,127 @@ body {
   box-shadow: var(--shadow);
 }
 
+.starter-shell {
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid rgba(139, 211, 168, 0.32);
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(24, 40, 33, 0.96), rgba(32, 53, 44, 0.9));
+  box-shadow: var(--shadow);
+}
+
+.starter-header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.starter-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.starter-actions button {
+  margin-top: 0;
+}
+
+.starter-readiness {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.starter-context {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.starter-context-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.starter-context-actions button {
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.starter-readiness-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(13, 23, 19, 0.72);
+  padding: 12px;
+}
+
+.starter-readiness-card strong,
+.starter-readiness-card span {
+  display: block;
+}
+
+.starter-readiness-card strong {
+  color: var(--accent-2);
+  margin-bottom: 6px;
+}
+
+.starter-readiness-card span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.starter-context-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(13, 23, 19, 0.72);
+  padding: 12px;
+}
+
+.starter-context-card strong,
+.starter-context-card span {
+  display: block;
+}
+
+.starter-context-card strong {
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.starter-context-card span {
+  color: var(--muted);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.panel-workspace-preset {
+  display: grid;
+  gap: 10px;
+}
+
+.workspace-preset-row,
+.workspace-preset-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.workspace-preset-actions button {
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+}
+
+#workspace-preset-status {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
 .mission-control-header,
 .mission-control-actions,
 .mission-status,
@@ -462,6 +583,74 @@ body {
   border-radius: var(--radius-sm);
   color: var(--muted);
   text-align: center;
+}
+
+.onboarding-wizard.hidden {
+  display: none;
+}
+
+.onboarding-wizard {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.onboarding-wizard-dialog {
+  position: relative;
+  z-index: 61;
+  width: min(560px, calc(100vw - 32px));
+  margin: 8vh auto 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(25, 41, 34, 0.98), rgba(13, 23, 19, 0.98));
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.onboarding-wizard-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.onboarding-wizard-header p {
+  margin: 6px 0 0;
+  color: var(--muted);
+}
+
+.onboarding-wizard-header button {
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+}
+
+.onboarding-wizard-form {
+  display: grid;
+  gap: 12px;
+}
+
+.onboarding-wizard-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.onboarding-wizard-form span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.onboarding-wizard-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.onboarding-wizard-actions button {
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
 }
 
 body[data-workbench-mode="chat"] [data-sidebar-panel="build"],
@@ -926,6 +1115,26 @@ button.hidden {
   background: linear-gradient(135deg, var(--user), #2a4a3b);
 }
 
+.session-item-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.session-item-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
 .chat-layout {
   display: grid;
   grid-template-rows: auto 1fr auto;
@@ -1067,11 +1276,13 @@ button.hidden {
 }
 
 .checkpoint-shell,
+.turn-shell,
 .timeline-shell {
   margin-bottom: 12px;
 }
 
 .checkpoint-header,
+.turn-header,
 .timeline-header {
   justify-content: space-between;
   margin-bottom: 10px;
@@ -1098,6 +1309,7 @@ button.hidden {
 }
 
 .session-checkpoints,
+.session-turns,
 .session-timeline,
 .session-operations {
   display: grid;
@@ -1105,6 +1317,7 @@ button.hidden {
 }
 
 .session-checkpoint-card,
+.session-turn-card,
 .session-timeline-card {
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
@@ -1127,6 +1340,32 @@ button.hidden {
 
 .session-checkpoint-card span {
   margin-top: 4px;
+}
+
+.session-turn-card strong,
+.session-turn-card span {
+  display: block;
+}
+
+.session-turn-card span {
+  margin-top: 4px;
+  color: var(--muted);
+  white-space: pre-wrap;
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.session-turn-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.session-turn-actions button {
+  width: auto;
+  min-width: 0;
+  margin-top: 0;
 }
 
 .session-checkpoint-actions,
@@ -1169,6 +1408,10 @@ button.hidden {
 
 .session-timeline-card.task {
   border-color: rgba(125, 173, 214, 0.55);
+}
+
+.session-timeline-card.turn {
+  border-color: rgba(94, 144, 214, 0.55);
 }
 
 .session-operations {

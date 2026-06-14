@@ -196,15 +196,29 @@ def test_session_store_persists_messages_and_metadata(tmp_path, monkeypatch):
     assert updated["ui_state"]["pending_task_assist"]["suggested_command"] == "pytest -q"
     assert updated["meta"]["pinned"] is True
     assert updated["meta"]["archived"] is False
+    turned, turn = store.append_turn(session["id"], kind="workspace_turn", title="turno 1", summary="validar fluxo", path="apps/web/app.js", workspace="jarvis", model="jarvis-programador", user_prompt="corrija", suggested_command="pytest -q", snapshot={"workspace": "jarvis", "ui_state": updated["ui_state"], "mission": updated["mission"]})
+    assert turned["turns"][0]["title"] == "turno 1"
+    restored_turn_session, restored_turn = store.restore_turn(session["id"], turn["id"])
+    assert restored_turn["id"] == turn["id"]
+    assert restored_turn_session["ui_state"]["active_file"] == "apps/web/app.js"
     listed = store.list_sessions()
     assert listed[0]["pinned"] is True
     assert listed[0]["preview"] == "estabilizar jarvis"
+    assert listed[0]["turn_count"] == 1
     checkpointed, checkpoint = store.create_checkpoint(session["id"], title="checkpoint inicial", summary="estado inicial")
     assert checkpointed["checkpoints"][0]["title"] == "checkpoint inicial"
     restored, restored_checkpoint = store.restore_checkpoint(session["id"], checkpoint["id"])
     assert restored_checkpoint["id"] == checkpoint["id"]
     assert restored["ui_state"]["active_file"] == "apps/web/app.js"
     assert Path(test_settings.sessions_dir / f"{session['id']}.json").exists()
+    markdown_snapshot = Path(test_settings.sessions_dir / f"{session['id']}.md")
+    assert markdown_snapshot.exists()
+    markdown_content = markdown_snapshot.read_text(encoding="utf-8")
+    assert "# Oi limpo" in markdown_content
+    assert "## Missao" in markdown_content
+    note_payload = store.get_session_note(session["id"])
+    assert note_payload["path"].endswith(f"{session['id']}.md")
+    assert "Conversa Recente" in note_payload["content"]
 
 
 def test_session_store_ignores_workspace_prefix_in_generated_title(tmp_path, monkeypatch):
@@ -372,8 +386,41 @@ def test_api_updates_can_clear_workspace_and_missing_session_returns_404(tmp_pat
     assert "approval-ok" in applied.json()["result"]["output"]
     assert any(item.get("source") == "auto" and item.get("trigger_event") == "approval_applied" for item in applied.json()["session"].get("checkpoints", []))
 
+    second_approval = client.post(
+        f"/api/chat/sessions/{session_id}/approvals",
+        json={
+            "kind": "terminal_command",
+            "title": "Comando pendente em lote",
+            "command": "printf 'batch-ok'",
+            "payload": {"command": "printf 'batch-ok'", "cwd": "."},
+        },
+    )
+    assert second_approval.status_code == 200
+
+    batch_applied = client.post(
+        f"/api/chat/sessions/{session_id}/approvals/batch",
+        json={"action": "apply", "pending_only": True},
+    )
+    assert batch_applied.status_code == 200
+    assert batch_applied.json()["count"] == 1
+    assert batch_applied.json()["results"][0]["approval"]["status"] == "applied"
+    assert "batch-ok" in batch_applied.json()["results"][0]["result"]["output"]
+
     missing = client.get("/api/chat/sessions/does-not-exist")
     assert missing.status_code == 404
+    note = client.get(f"/api/chat/sessions/{session_id}/note")
+    assert note.status_code == 200
+    assert note.json()["path"].endswith(f"{session_id}.md")
+    assert "## Estado Operacional" in note.json()["content"]
+    synced_note = client.post(
+        f"/api/chat/sessions/{session_id}/note/sync",
+        json={"workspace": "jarvis", "remember": True, "index": True, "force": True},
+    )
+    assert synced_note.status_code == 200
+    assert synced_note.json()["remembered"] is True
+    assert synced_note.json()["indexed"] is True
+    assert synced_note.json()["workspace"] == "jarvis"
+    assert "knowledge/jarvis/obsidian" in synced_note.json()["knowledge"]["stored_path"]
 
 
 def test_api_session_message_updates_hierarchical_memory(tmp_path, monkeypatch):
@@ -575,6 +622,34 @@ def test_workspace_and_terminal_api(tmp_path, monkeypatch):
     assert workspace_turn.json()["session"]["messages"][-1]["metadata"]["workspace_turn"] is True
     assert workspace_turn.json()["session"]["messages"][-2]["attachments"][0]["name"] == "context.txt"
     assert workspace_turn.json()["session"]["operations"][-1]["kind"] == "workspace_turn"
+    assert workspace_turn.json()["session"]["turns"][-1]["kind"] == "workspace_turn"
+    turn_id = workspace_turn.json()["turn"]["id"]
+    restored_turn = client.post(f"/api/chat/sessions/{workspace_session_id}/turns/{turn_id}/restore")
+    assert restored_turn.status_code == 200
+    assert restored_turn.json()["turn"]["id"] == turn_id
+    assert restored_turn.json()["session"]["ui_state"]["pending_task_assist"]["summary"] == "Analise inicial pronta"
+
+    streamed_workspace_turn = client.post(
+        f"/api/chat/sessions/{workspace_session_id}/workspace-turn/stream",
+        json={
+            "model": "jarvis-programador-safe",
+            "content": "Analise de novo o arquivo ativo e proponha a proxima ação.",
+            "display_content": "Analise de novo o arquivo ativo e proponha a proxima ação.",
+            "workspace": "jarvis",
+            "path": "hello.txt",
+            "file_content": "hello",
+            "terminal_output": "pytest falhou no arquivo ativo",
+            "attachments": [],
+        },
+    )
+    assert streamed_workspace_turn.status_code == 200
+    streamed_body = streamed_workspace_turn.text
+    assert '"type": "start"' in streamed_body
+    assert '"type": "phase"' in streamed_body
+    assert '"type": "done"' in streamed_body
+    streamed_session = client.get(f"/api/chat/sessions/{workspace_session_id}")
+    assert streamed_session.status_code == 200
+    assert streamed_session.json()["session"]["turns"][-1]["kind"] == "workspace_turn"
 
     task_cycle = client.post(
         "/api/workspace/task-cycle",

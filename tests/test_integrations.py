@@ -187,6 +187,8 @@ def test_pwa_contains_session_management_controls():
     assert 'id="session-title"' in html
     assert 'id="pin-session"' in html
     assert 'id="archive-session"' in html
+    assert 'id="open-session-note"' in html
+    assert 'id="attach-session-note"' in html
     assert 'id="session-filters"' in html
     assert 'data-session-filter="active"' in html
     assert 'data-session-filter="archived"' in html
@@ -212,6 +214,24 @@ def test_pwa_contains_session_management_controls():
     assert 'id="mission-status-input"' in html
     assert 'id="mission-next-steps-input"' in html
     assert 'id="save-mission"' in html
+    assert 'id="starter-inspect-project"' in html
+    assert 'id="starter-fix-error"' in html
+    assert 'id="starter-create-file"' in html
+    assert 'id="starter-next-step"' in html
+    assert 'id="starter-guided"' in html
+    assert 'id="starter-readiness"' in html
+    assert 'id="starter-context"' in html
+    assert 'id="workspace-quality-first"' in html
+    assert 'id="workspace-auto-profile"' in html
+    assert 'id="apply-workspace-preset"' in html
+    assert 'id="save-workspace-preset"' in html
+    assert 'id="workspace-preset-status"' in html
+    assert 'id="onboarding-wizard"' in html
+    assert 'id="onboarding-wizard-form"' in html
+    assert 'id="onboarding-mode"' in html
+    assert 'id="onboarding-workspace"' in html
+    assert 'id="onboarding-goal"' in html
+    assert 'id="onboarding-target-path"' in html
     assert 'id="task-title"' in html
     assert 'id="task-phase"' in html
     assert 'id="create-task"' in html
@@ -224,6 +244,7 @@ def test_pwa_contains_session_management_controls():
     assert 'id="close-command-palette"' in html
     assert "STORAGE_KEY" in js
     assert "WORKBENCH_MODE_KEY" in js
+    assert "WORKSPACE_PRESETS_KEY" in js
     assert 'method: "DELETE"' in js
 
 
@@ -254,6 +275,8 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "normalizeSessionMeta" in js
     assert "setSessionFilter" in js
     assert "toggleCurrentSessionMeta" in js
+    assert "openCurrentSessionNote" in js
+    assert "attachCurrentSessionNote" in js
     assert "compareSessionsForSidebar" in js
     assert "exportCurrentSessionMarkdown" in js
     assert 'data-dropzone="idle"' in html
@@ -270,6 +293,7 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert 'id="refresh-operations"' in html
     assert 'id="create-checkpoint"' in html
     assert 'id="session-checkpoints"' in html
+    assert 'id="session-turns"' in html
     assert 'id="session-timeline"' in html
     assert 'id="timeline-filters"' in html
     assert 'id="session-operations"' in html
@@ -324,6 +348,8 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert 'id="github-title"' in html
     assert 'id="git-output"' in html
     assert 'id="refresh-approvals"' in html
+    assert 'id="apply-pending-approvals"' in html
+    assert 'id="reject-pending-approvals"' in html
     assert 'id="self-improve-active"' in html
     assert 'id="queue-suggested-command"' in html
     assert 'id="queue-edit-proposal"' in html
@@ -333,6 +359,7 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert 'id="chat-about-note"' in html
     assert 'id="obsidian-auto-remember"' in html
     assert 'id="obsidian-auto-index"' in html
+    assert 'id="sync-session-note"' in html
     assert 'id="recent-files"' in html
     assert 'id="clear-recent-files"' in html
     assert 'id="slash-commands"' in html
@@ -356,6 +383,8 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "renderSessionOperations" in js
     assert "renderSessionCheckpoints" in js
     assert "renderSessionTimeline" in js
+    assert "renderSessionTurns" in js
+    assert "restoreSessionTurn" in js
     assert "setTimelineFilter" in js
     assert "classifyTimelineItem" in js
     assert "createSessionCheckpoint" in js
@@ -372,17 +401,42 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "rememberCurrentNote" in js
     assert "indexCurrentNote" in js
     assert "prepareChatFromCurrentNote" in js
+    assert "syncCurrentSessionNoteToObsidian" in js
     assert "openNativeLinuxTerminal" in js
     assert "openNativeLinuxTerminalForActiveFile" in js
     assert "runTerminalCommandFromInput" in js
     assert "renderRecentFiles" in js
     assert "renderSlashCommands" in js
     assert "loadWorkbenchMode" in js
+    assert "loadWorkspacePresets" in js
+    assert "applyWorkspacePresetForCurrent" in js
+    assert "saveWorkspacePreset" in js
+    assert "resolveAdaptiveModel" in js
+    assert "syncAdaptiveModel" in js
+    assert "QUALITY_MODEL_MAP" in js
     assert "setWorkbenchMode" in js
     assert "preparePromptForActiveFile" in js
     assert "preparePromptForTerminalDebug" in js
     assert "preparePromptForCreateFile" in js
     assert "preparePromptForNextStep" in js
+    assert "startGettingStartedFlow" in js
+    assert "ensureStarterTerminalReady" in js
+    assert "persistMission(" in js
+    assert "buildEmptySessionBriefing" in js
+    assert "Comece de um destes jeitos:" in js
+    assert "openOnboardingWizard" in js
+    assert "submitOnboardingWizard" in js
+    assert "shouldOpenOnboardingWizard" in js
+    assert "Assistente guiado de inicio" in js
+    assert "renderStarterReadiness" in js
+    assert "loadStarterContext" in js
+    assert "renderStarterContext" in js
+    assert "Ultimo comando" in js
+    assert "Ultimo erro" in js
+    assert "Diagnosticar erro" in js
+    assert "Retomar trabalho" in js
+    assert "buildStarterResumeAction" in js
+    assert "executeStarterResumeAction" in js
     assert "/delegate -> usa o prompt atual para gerar diff/comando e enfileirar acoes" in js
     assert "buildMissionModel" in js
     assert "buildMissionActions" in js
@@ -453,7 +507,13 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert '"/queue-edit"' in js
     assert '"/self-review"' in js
     assert "/api/chat/sessions/${currentSessionId}/approvals" in js
+    assert "/api/chat/sessions/${currentSessionId}/approvals/batch" in js
+    assert "/api/chat/sessions/${currentSessionId}/note" in js
+    assert "/api/chat/sessions/${currentSessionId}/note/sync" in js
     assert "/api/chat/sessions/${sessionId}/workspace-turn" in js
+    assert "/api/chat/sessions/${sessionId}/workspace-turn/stream" in js
+    assert "/api/chat/sessions/${currentSessionId}/turns/${turnId}/restore" in js
+    assert "actOnPendingApprovals" in js
     assert "saveAllEditors" in js
     assert "attachOpenTabsToChat" in js
     assert "runEditorSelectionInTerminal" in js
@@ -478,6 +538,10 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "session-operation-card" in css
     assert "session-checkpoint-card" in css
     assert "session-timeline-card" in css
+    assert "session-turn-card" in css
+    assert "session-turn-actions" in css
+    assert "session-item-actions" in css
+    assert "session-item-action" in css
     assert "timeline-filters" in css
     assert "timeline-filter.active" in css
     assert "workspace-codex-grid" in css
@@ -507,6 +571,17 @@ def test_pwa_contains_streaming_attachments_and_quick_actions():
     assert "workbench-modes" in css
     assert "workbench-status" in css
     assert "mission-control-shell" in css
+    assert ".starter-shell" in css
+    assert ".panel-workspace-preset" in css
+    assert ".workspace-preset-row" in css
+    assert ".workspace-preset-actions" in css
+    assert ".starter-actions" in css
+    assert ".starter-readiness" in css
+    assert ".starter-readiness-card" in css
+    assert ".starter-context" in css
+    assert ".starter-context-card" in css
+    assert ".onboarding-wizard-dialog" in css
+    assert ".onboarding-wizard-form" in css
     assert "mission-control-header" in css
     assert "mission-status" in css
     assert "mission-card" in css

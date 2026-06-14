@@ -86,12 +86,31 @@ class SessionStore:
     def save_session(self, session_id: str, payload: dict) -> dict:
         payload["updated_at"] = _now_iso()
         self._write(self._path(session_id), payload)
+        self._write_markdown_snapshot(self._markdown_path(session_id), payload)
         return payload
 
     def delete_session(self, session_id: str) -> None:
         path = self._path(session_id)
         if path.exists():
             path.unlink()
+        markdown_path = self._markdown_path(session_id)
+        if markdown_path.exists():
+            markdown_path.unlink()
+
+    def get_session_note(self, session_id: str) -> dict[str, str]:
+        session = self.get_session(session_id)
+        path = self._markdown_path(session_id)
+        if not path.exists():
+            self._write_markdown_snapshot(path, session)
+        try:
+            display_path = str(path.relative_to(settings.workspace_root))
+        except ValueError:
+            display_path = str(path)
+        return {
+            "path": display_path,
+            "content": path.read_text(encoding="utf-8"),
+            "updated_at": session.get("updated_at") or _now_iso(),
+        }
 
 
     def append_operation(
@@ -617,6 +636,9 @@ class SessionStore:
     def _path(self, session_id: str) -> Path:
         return self.root / f"{session_id}.json"
 
+    def _markdown_path(self, session_id: str) -> Path:
+        return self.root / f"{session_id}.md"
+
     def _derive_title(self, *, user_content: str, user_display_content: str | None) -> str:
         raw_title = (user_display_content or user_content).strip()
         if not raw_title:
@@ -635,3 +657,120 @@ class SessionStore:
 
     def _write(self, path: Path, payload: dict) -> None:
         path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    def _write_markdown_snapshot(self, path: Path, session: dict) -> None:
+        path.write_text(self._render_markdown_snapshot(session), encoding="utf-8")
+
+    def _render_markdown_snapshot(self, session: dict) -> str:
+        mission = self._normalize_mission(session.get("mission") or None)
+        ui_state = self._normalize_ui_state(session.get("ui_state") or None)
+        meta = self._normalize_meta(session.get("meta") or None)
+        tasks = list(session.get("tasks") or [])
+        approvals = list(session.get("approvals") or [])
+        operations = list(session.get("operations") or [])
+        turns = list(session.get("turns") or [])
+        messages = list(session.get("messages") or [])
+        lines = [
+            "---",
+            f"session_id: {session.get('id')}",
+            f"title: {json.dumps(session.get('title') or 'Nova conversa', ensure_ascii=False)}",
+            f"model: {session.get('model') or 'jarvis'}",
+            f"workspace: {json.dumps(session.get('workspace') or '', ensure_ascii=False)}",
+            f"created_at: {session.get('created_at') or _now_iso()}",
+            f"updated_at: {session.get('updated_at') or _now_iso()}",
+            f"pinned: {'true' if meta.get('pinned') else 'false'}",
+            f"archived: {'true' if meta.get('archived') else 'false'}",
+            f"active_file: {json.dumps(ui_state.get('active_file') or '', ensure_ascii=False)}",
+            f"message_count: {len(messages)}",
+            f"task_count: {len(tasks)}",
+            f"approval_count: {len(approvals)}",
+            f"turn_count: {len(turns)}",
+            "---",
+            "",
+            f"# {session.get('title') or 'Nova conversa'}",
+            "",
+        ]
+        if mission.get("objective") or mission.get("next_steps"):
+            lines.extend([
+                "## Missao",
+                "",
+                f"- Objetivo: {mission.get('objective') or 'nao definido'}",
+                f"- Status: {mission.get('status') or 'idle'}",
+                f"- Atualizada em: {mission.get('updated_at') or _now_iso()}",
+            ])
+            next_steps = [str(item).strip() for item in mission.get("next_steps") or [] if str(item).strip()]
+            if next_steps:
+                lines.extend(["- Proximos passos:"] + [f"  - {item}" for item in next_steps])
+            lines.append("")
+        lines.extend([
+            "## Estado Operacional",
+            "",
+            f"- Workspace: {session.get('workspace') or 'nenhum'}",
+            f"- Perfil: {session.get('model') or 'jarvis'}",
+            f"- Arquivo ativo: {ui_state.get('active_file') or 'nenhum'}",
+            f"- Abas abertas: {', '.join(ui_state.get('open_files') or []) or 'nenhuma'}",
+            f"- Fluxo rapido: {ui_state.get('quick_flow_mode') or 'nenhum'}",
+            "",
+        ])
+        if tasks:
+            lines.extend(["## Tarefas", ""])
+            for task in tasks[-12:]:
+                title = str(task.get("title") or "Nova tarefa")
+                phase = str(task.get("phase") or "planner")
+                status = str(task.get("status") or "todo")
+                objective = str(task.get("objective") or "").strip()
+                lines.append(f"- {title} [{phase} / {status}]")
+                if objective:
+                    lines.append(f"  - objetivo: {objective}")
+            lines.append("")
+        pending_approvals = [item for item in approvals if item.get("status") == "pending"]
+        if pending_approvals:
+            lines.extend(["## Aprovacoes Pendentes", ""])
+            for approval in pending_approvals[-12:]:
+                title = str(approval.get("title") or approval.get("kind") or "acao")
+                path_or_command = approval.get("path") or approval.get("command") or approval.get("detail") or ""
+                lines.append(f"- {title}")
+                if path_or_command:
+                    lines.append(f"  - {str(path_or_command)[:500]}")
+            lines.append("")
+        if operations:
+            lines.extend(["## Ultimas Operacoes", ""])
+            for operation in operations[-12:]:
+                title = str(operation.get("title") or operation.get("kind") or "operacao")
+                detail = operation.get("detail") or operation.get("command") or operation.get("path") or ""
+                created_at = operation.get("created_at") or ""
+                lines.append(f"- {title} ({created_at})")
+                if detail:
+                    lines.append(f"  - {str(detail)[:500]}")
+            lines.append("")
+        if turns:
+            lines.extend(["## Turnos Operacionais", ""])
+            for turn in turns[-8:]:
+                title = str(turn.get("title") or "turno operacional")
+                summary = str(turn.get("summary") or "").strip()
+                path = str(turn.get("path") or "").strip()
+                created_at = turn.get("created_at") or ""
+                lines.append(f"- {title} ({created_at})")
+                if summary:
+                    lines.append(f"  - resumo: {summary}")
+                if path:
+                    lines.append(f"  - arquivo: {path}")
+            lines.append("")
+        lines.extend(["## Conversa Recente", ""])
+        recent_messages = messages[-12:]
+        if not recent_messages:
+            lines.append("_Sessao ainda sem mensagens._")
+        else:
+            for message in recent_messages:
+                role = str(message.get("role") or "assistant").strip().title()
+                content = str(message.get("display_content") or message.get("content") or "").strip()
+                if not content:
+                    continue
+                lines.extend([f"### {role}", "", content[:12_000], ""])
+                attachments = message.get("attachments") or []
+                if attachments:
+                    lines.append("Anexos:")
+                    for attachment in attachments[:8]:
+                        lines.append(f"- {attachment.get('name')}")
+                    lines.append("")
+        return "\n".join(lines).rstrip() + "\n"

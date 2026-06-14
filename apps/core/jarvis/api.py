@@ -29,10 +29,12 @@ from jarvis.schemas import (
     StateUpdateRequest,
     SummarizeMemoryRequest,
     SessionApprovalActionRequest,
+    SessionApprovalBatchActionRequest,
     SessionApprovalRequest,
     SessionCheckpointCreateRequest,
     SessionCreateRequest,
     SessionMessageRequest,
+    SessionNoteSyncRequest,
     SessionWorkspaceTurnRequest,
     SessionOperationRequest,
     SessionTaskCreateRequest,
@@ -840,6 +842,67 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
     def get_chat_session(session_id: str):
         return {"status": "ok", "session": require_session(session_id)}
 
+    @router.get("/api/chat/sessions/{session_id}/note")
+    def get_chat_session_note(session_id: str):
+        require_session(session_id)
+        note = sessions.get_session_note(session_id)
+        return {"status": "ok", **note}
+
+    @router.post("/api/chat/sessions/{session_id}/note/sync")
+    def sync_chat_session_note(session_id: str, request: SessionNoteSyncRequest):
+        session = require_session(session_id)
+        note = sessions.get_session_note(session_id)
+        workspace_name = (
+            request.workspace
+            or session.get("workspace")
+            or ((session.get("mission") or {}).get("objective") and "jarvis")
+            or "jarvis"
+        )
+        safe_title = (session.get("title") or f"session-{session_id}")[:80]
+        sync_result: dict[str, object] = {
+            "path": note["path"],
+            "remembered": False,
+            "indexed": False,
+            "workspace": workspace_name,
+        }
+        if request.remember:
+            field = f"session.{session_id[:12]}"
+            memory.apply(
+                MemoryAction(
+                    action="append_workspace_note",
+                    field=field,
+                    value=f"Sessao: {safe_title}\nPath: {note['path']}\n\n{note['content'][:4000]}",
+                    workspace=workspace_name,
+                    source="api-session-note-sync",
+                )
+            )
+            sync_result["remembered"] = True
+            sync_result["memory_field"] = field
+        if request.index:
+            indexed = knowledge.ingest_note(
+                domain=workspace_name,
+                title=safe_title,
+                content=note["content"],
+                source_path=note["path"],
+                force=request.force,
+            )
+            sync_result["indexed"] = True
+            sync_result["knowledge"] = indexed
+        emit_session_event(
+            session_id,
+            "session_note_synced",
+            {"workspace": workspace_name, "remembered": sync_result["remembered"], "indexed": sync_result["indexed"]},
+            source="api",
+        )
+        sessions.append_operation(
+            session_id,
+            kind="session_note_sync",
+            title="Sincronizou nota da sessão",
+            path=note["path"],
+            detail=f"workspace {workspace_name} · memoria={sync_result['remembered']} · rag={sync_result['indexed']}",
+        )
+        return {"status": "ok", **sync_result, "session": sessions.get_session(session_id)}
+
     @router.put("/api/chat/sessions/{session_id}")
     def update_chat_session(session_id: str, request: SessionUpdateRequest):
         session = require_session(session_id)
@@ -973,12 +1036,11 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
         emit_session_event(session_id, "approval_created", {"kind": request.kind, "title": request.title, "path": request.path, "command": request.command}, source="api")
         return {"status": "ok", "session": session, "approval": session.get("approvals", [])[-1]}
 
-    @router.post("/api/chat/sessions/{session_id}/approvals/{approval_id}")
-    def apply_chat_session_approval(session_id: str, approval_id: str, request: SessionApprovalActionRequest):
+    def execute_approval_action(session_id: str, approval_id: str, action: str) -> tuple[dict, dict, dict | None]:
         require_session(session_id)
         approval = sessions.get_approval(session_id, approval_id)
 
-        if request.action == "reject":
+        if action == "reject":
             session, updated_approval = sessions.update_approval(session_id, approval_id, status="rejected")
             session = sessions.append_operation(
                 session_id,
@@ -990,7 +1052,7 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
                 metadata={"approval_id": approval_id, "kind": approval.get("kind")},
             )
             emit_session_event(session_id, "approval_rejected", {"approval_id": approval_id, "kind": approval.get("kind")}, source="api")
-            return {"status": "ok", "session": sessions.get_session(session_id), "approval": updated_approval, "result": None}
+            return sessions.get_session(session_id), updated_approval, None
 
         result: dict[str, object] | None = None
         approval_kind = str(approval.get("kind") or "").strip()
@@ -1036,10 +1098,43 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
             metadata={"approval_id": approval_id, "kind": approval_kind, "result": result},
         )
         emit_session_event(session_id, "approval_applied", {"approval_id": approval_id, "kind": approval_kind}, source="api")
-        return {"status": "ok", "session": sessions.get_session(session_id), "approval": updated_approval, "result": result}
+        return sessions.get_session(session_id), updated_approval, result
 
-    @router.post("/api/chat/sessions/{session_id}/workspace-turn")
-    def create_chat_session_workspace_turn(session_id: str, request: SessionWorkspaceTurnRequest):
+    @router.post("/api/chat/sessions/{session_id}/approvals/batch")
+    def apply_chat_session_approvals_batch(session_id: str, request: SessionApprovalBatchActionRequest):
+        session = require_session(session_id)
+        approvals = session.get("approvals", [])
+        selected_ids = {item for item in (request.approval_ids or []) if item}
+        target_ids: list[str] = []
+        for approval in approvals:
+            approval_id = str(approval.get("id") or "").strip()
+            if not approval_id:
+                continue
+            if selected_ids and approval_id not in selected_ids:
+                continue
+            if request.pending_only and approval.get("status") != "pending":
+                continue
+            target_ids.append(approval_id)
+
+        results: list[dict[str, object]] = []
+        for approval_id in target_ids:
+            _, updated_approval, result = execute_approval_action(session_id, approval_id, request.action)
+            results.append({"approval": updated_approval, "result": result})
+
+        return {
+            "status": "ok",
+            "session": sessions.get_session(session_id),
+            "action": request.action,
+            "count": len(results),
+            "results": results,
+        }
+
+    @router.post("/api/chat/sessions/{session_id}/approvals/{approval_id}")
+    def apply_chat_session_approval(session_id: str, approval_id: str, request: SessionApprovalActionRequest):
+        session, updated_approval, result = execute_approval_action(session_id, approval_id, request.action)
+        return {"status": "ok", "session": session, "approval": updated_approval, "result": result}
+
+    def execute_workspace_turn(session_id: str, request: SessionWorkspaceTurnRequest) -> dict[str, object]:
         session = require_session(session_id)
         user_content = request.content
         if request.workspace:
@@ -1169,7 +1264,51 @@ def create_api_router(ollama: OllamaClient, memory: MemoryService, knowledge: Kn
             "task_assist": task_assist,
             "approvals": queued_approvals,
             "turn": turn,
+            "assistant_metadata": assistant_metadata,
+            "target_path": path,
         }
+
+    @router.post("/api/chat/sessions/{session_id}/workspace-turn")
+    def create_chat_session_workspace_turn(session_id: str, request: SessionWorkspaceTurnRequest):
+        return execute_workspace_turn(session_id, request)
+
+    @router.post("/api/chat/sessions/{session_id}/workspace-turn/stream")
+    def create_chat_session_workspace_turn_stream(session_id: str, request: SessionWorkspaceTurnRequest):
+        def chunk_text(text: str, size: int = 160):
+            for index in range(0, len(text), size):
+                yield text[index:index + size]
+
+        def event_stream():
+            try:
+                session = require_session(session_id)
+                user_content = request.content
+                if request.workspace:
+                    user_content = f"[WORKSPACE: {request.workspace}]\n{user_content}"
+                existing_messages = session.get("messages", [])
+                messages = [ChatMessage.model_validate(message) for message in existing_messages]
+                messages.append(ChatMessage(role="user", content=user_content))
+                assistant_metadata = jarvis.describe_request(request.model, messages)
+                start_payload = {"type": "start", "session_id": session_id, "model": request.model, "assistant_metadata": assistant_metadata}
+                yield f"data: {json.dumps(start_payload)}\n\n"
+                yield f"data: {json.dumps({'type': 'phase', 'phase': 'analyzing', 'label': 'Jarvis analisando workspace, arquivo ativo e terminal'})}\n\n"
+                payload = execute_workspace_turn(session_id, request)
+                phase_payload = {
+                    "type": "phase",
+                    "phase": "planning",
+                    "label": "Plano operacional pronto",
+                    "summary": payload["task_assist"].get("summary"),
+                    "queued_approvals": len(payload["approvals"]),
+                }
+                yield f"data: {json.dumps(phase_payload)}\n\n"
+                for chunk in chunk_text(str(payload["message"] or "")):
+                    yield f"data: {json.dumps({'type': 'chunk', 'delta': chunk})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', **payload})}\n\n"
+                yield "data: [DONE]\n\n"
+            except Exception as exc:
+                yield f"data: {json.dumps({'type': 'error', 'detail': str(exc)})}\n\n"
+                yield "data: [DONE]\n\n"
+
+        return StreamingResponse(event_stream(), media_type="text/event-stream")
 
     @router.post("/api/chat/sessions/{session_id}/turns/{turn_id}/restore")
     def restore_chat_session_turn(session_id: str, turn_id: str):

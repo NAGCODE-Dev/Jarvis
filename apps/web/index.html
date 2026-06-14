@@ -23,14 +23,14 @@
         <section class="panel">
           <label for="model">Perfil</label>
           <select id="model">
+            <option value="jarvis" selected>Jarvis Geral Quality</option>
+            <option value="jarvis-programador">Jarvis Programador Quality</option>
+            <option value="jarvis-pesquisador">Jarvis Pesquisador Quality</option>
+            <option value="jarvis-professor">Jarvis Professor Quality</option>
+            <option value="jarvis-coach">Jarvis Coach Quality</option>
             <option value="jarvis-safe">Jarvis Geral Safe</option>
             <option value="jarvis-programador-safe">Jarvis Programador Safe</option>
             <option value="jarvis-pesquisador-safe">Jarvis Pesquisador Safe</option>
-            <option value="jarvis">Jarvis Geral Quality</option>
-            <option value="jarvis-professor">Jarvis Professor Quality</option>
-            <option value="jarvis-coach">Jarvis Coach Quality</option>
-            <option value="jarvis-programador">Jarvis Programador Quality</option>
-            <option value="jarvis-pesquisador">Jarvis Pesquisador Quality</option>
           </select>
         </section>
 
@@ -38,6 +38,19 @@
           <label for="workspace">Workspace</label>
           <input id="workspace" placeholder="jarvis, faculdade, crossfit..." />
           <small>Opcional. Adicionado ao prompt como contexto explícito.</small>
+        </section>
+
+        <section class="panel panel-workspace-preset">
+          <label>Preset do workspace</label>
+          <div class="workspace-preset-row">
+            <label class="context-toggle"><input id="workspace-quality-first" type="checkbox" checked /> Preferir qualidade</label>
+            <label class="context-toggle"><input id="workspace-auto-profile" type="checkbox" checked /> Troca automática de perfil</label>
+          </div>
+          <div class="workspace-preset-actions">
+            <button id="apply-workspace-preset" type="button" class="secondary">Aplicar preset</button>
+            <button id="save-workspace-preset" type="button" class="secondary">Salvar preset</button>
+          </div>
+          <small id="workspace-preset-status">Sem preset salvo para este workspace ainda.</small>
         </section>
 
         <section class="panel panel-chat-tools" data-sidebar-panel="chat">
@@ -64,6 +77,8 @@
           <div class="session-current-actions">
             <button id="pin-session" type="button" class="secondary">Fixar</button>
             <button id="archive-session" type="button" class="secondary">Arquivar</button>
+            <button id="open-session-note" type="button" class="secondary">Abrir nota</button>
+            <button id="attach-session-note" type="button" class="secondary">Anexar resumo</button>
           </div>
           <small>Você pode renomear a conversa atual e controlar sua prioridade.</small>
         </section>
@@ -194,6 +209,23 @@
             </div>
           </div>
           <div id="workbench-status" class="workbench-status"></div>
+          <section class="starter-shell">
+            <div class="starter-header">
+              <div>
+                <strong>Comecar Agora</strong>
+                <p>Abra o Jarvis e escolha um ponto de partida pronto. Ele prepara terminal, missao e prompt inicial.</p>
+              </div>
+            </div>
+            <div class="starter-actions">
+              <button id="starter-inspect-project" type="button" class="secondary">Entender projeto</button>
+              <button id="starter-fix-error" type="button" class="secondary">Corrigir erro</button>
+              <button id="starter-create-file" type="button" class="secondary">Criar arquivo</button>
+              <button id="starter-next-step" type="button" class="secondary">Proximo passo</button>
+              <button id="starter-guided" type="button" class="secondary">Assistente guiado</button>
+            </div>
+            <div id="starter-readiness" class="starter-readiness">Carregando prontidao local...</div>
+            <div id="starter-context" class="starter-context">Carregando contexto atual...</div>
+          </section>
           <section class="mission-control-shell">
             <div class="mission-control-header">
               <div>
@@ -253,6 +285,8 @@
             </div>
             <div class="approval-toolbar">
               <button id="refresh-approvals" type="button" class="secondary">Atualizar</button>
+              <button id="apply-pending-approvals" type="button" class="secondary">Aplicar pendentes</button>
+              <button id="reject-pending-approvals" type="button" class="secondary danger">Rejeitar pendentes</button>
               <button id="self-improve-active" type="button" class="secondary">Autoaprimorar arquivo</button>
             </div>
           </div>
@@ -272,6 +306,7 @@
                   <button id="remember-note" type="button" class="secondary">Lembrar nota</button>
                   <button id="index-note" type="button" class="secondary">Indexar nota</button>
                   <button id="chat-about-note" type="button" class="secondary">Usar no chat</button>
+                  <button id="sync-session-note" type="button" class="secondary">Sessao -> nota</button>
                 </div>
               </div>
               <pre id="obsidian-status" class="obsidian-status">Abra uma nota Markdown para usar memória e conhecimento do Obsidian no Jarvis.</pre>
@@ -302,6 +337,13 @@
                 <span>Marcos explícitos do trabalho para replay e restauração de contexto.</span>
               </div>
               <div id="session-checkpoints" class="session-checkpoints">Nenhum checkpoint ainda.</div>
+            </div>
+            <div class="turn-shell">
+              <div class="turn-header">
+                <strong>Turnos Operacionais</strong>
+                <span>Cada rodada planner/executor/verifier/memory do Jarvis com snapshot restaurável.</span>
+              </div>
+              <div id="session-turns" class="session-turns">Nenhum turno operacional ainda.</div>
             </div>
             <div class="timeline-shell">
               <div class="timeline-header">
@@ -415,11 +457,11 @@
             autocomplete="off"
           ></textarea>
           <div class="composer-actions">
-            <span id="hint">Shift+Enter cria nova linha</span>
+            <span id="hint">`Chat` conversa. `Jarvis agir` analisa arquivo, terminal e pode enfileirar diff/comando. Shift+Enter cria nova linha.</span>
             <div class="composer-buttons">
               <button id="export-chat" type="button" class="secondary">Exportar MD</button>
               <button id="send-codex" type="button" class="secondary">Jarvis agir</button>
-              <button id="send" type="submit">Enviar</button>
+              <button id="send" type="submit">Chat</button>
             </div>
           </div>
         </form>
@@ -435,6 +477,46 @@
         </div>
         <input id="command-palette-input" placeholder="Buscar comando, ex: abrir arquivo, terminal, modo build..." autocomplete="off" />
         <div id="command-palette-results" class="command-palette-results"></div>
+      </div>
+    </div>
+
+    <div id="onboarding-wizard" class="onboarding-wizard hidden" aria-hidden="true">
+      <div id="onboarding-wizard-backdrop" class="command-palette-backdrop"></div>
+      <div class="onboarding-wizard-dialog" role="dialog" aria-modal="true" aria-labelledby="onboarding-wizard-title">
+        <div class="onboarding-wizard-header">
+          <div>
+            <strong id="onboarding-wizard-title">Assistente De Inicio</strong>
+            <p>Defina o que voce quer fazer e o Jarvis prepara a sessao, a missao e o primeiro prompt.</p>
+          </div>
+          <button id="close-onboarding-wizard" type="button" class="secondary">Fechar</button>
+        </div>
+        <form id="onboarding-wizard-form" class="onboarding-wizard-form">
+          <label>
+            <span>Modo inicial</span>
+            <select id="onboarding-mode">
+              <option value="inspect-project">Entender projeto</option>
+              <option value="fix-error">Corrigir erro</option>
+              <option value="create-file">Criar arquivo</option>
+              <option value="next-step">Descobrir proximo passo</option>
+            </select>
+          </label>
+          <label>
+            <span>Workspace</span>
+            <input id="onboarding-workspace" placeholder="jarvis, faculdade, crossfit..." />
+          </label>
+          <label>
+            <span>Objetivo</span>
+            <input id="onboarding-goal" placeholder="Ex: entender a arquitetura atual e propor o proximo passo" />
+          </label>
+          <label>
+            <span>Arquivo alvo opcional</span>
+            <input id="onboarding-target-path" placeholder="Ex: apps/web/app.js ou notes/tarefa.md" />
+          </label>
+          <div class="onboarding-wizard-actions">
+            <button id="onboarding-start" type="submit">Preparar Sessao</button>
+            <button id="onboarding-skip" type="button" class="secondary">Agora nao</button>
+          </div>
+        </form>
       </div>
     </div>
 

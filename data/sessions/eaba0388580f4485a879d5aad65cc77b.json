@@ -1,0 +1,74 @@
+{
+  "id": "eaba0388580f4485a879d5aad65cc77b",
+  "title": "PWA Smoke",
+  "model": "jarvis-programador-safe",
+  "workspace": "jarvis",
+  "created_at": "2026-06-14T03:31:50+00:00",
+  "updated_at": "2026-06-14T03:32:05+00:00",
+  "messages": [
+    {
+      "role": "user",
+      "content": "[WORKSPACE: jarvis]\nresponda somente OK",
+      "display_content": "pwa smoke"
+    },
+    {
+      "role": "assistant",
+      "content": "OK",
+      "metadata": {
+        "visible_model": "jarvis-programador-safe",
+        "effective_agent": "jarvis-programador-safe",
+        "route_kind": "coder",
+        "workspace": null,
+        "use_rag": false,
+        "task_type": "coding",
+        "primary_model": "qwen2.5-coder:1.5b",
+        "fallback_model": "qwen2.5:3b",
+        "profile": "safe"
+      }
+    }
+  ],
+  "operations": [],
+  "approvals": [],
+  "mission": {
+    "objective": null,
+    "status": "idle",
+    "next_steps": [],
+    "updated_at": "2026-06-14T03:31:50+00:00"
+  },
+  "ui_state": {
+    "active_file": null,
+    "open_files": [],
+    "quick_flow_mode": null,
+    "quick_target_path": null,
+    "quick_goal": null,
+    "draft_prompt": null,
+    "editor_instruction": null,
+    "terminal_command": null,
+    "workbench_mode": null,
+    "terminal_tail": null,
+    "pending_attachments": [],
+    "pending_edit_proposal": null,
+    "pending_batch_proposal": null,
+    "pending_task_assist": null,
+    "updated_at": "2026-06-14T03:31:50+00:00"
+  },
+  "meta": {
+    "pinned": false,
+    "archived": false
+  },
+  "tasks": [],
+  "events": [
+    {
+      "type": "memory_updated",
+      "payload": {
+        "workspace": "jarvis",
+        "model": "jarvis-programador-safe",
+        "source": "memory"
+      },
+      "source": "memory",
+      "created_at": "2026-06-14T03:32:05+00:00"
+    }
+  ],
+  "checkpoints": [],
+  "turns": []
+}
